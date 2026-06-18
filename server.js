@@ -8,11 +8,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from the dist directory (for production)
+app.use(express.static(join(__dirname, 'dist')));
 
 // SQLite Database Setup
 const dbPath = join(__dirname, 'mi_base.db');
@@ -291,6 +294,11 @@ app.delete('/api/productos/:id', (req, res) => {
     }
     res.json({ message: "Product deleted successfully", id });
   });
+});
+
+// Catch-all route for SPA (Single Page Application)
+app.get('*', (req, res) => {
+  res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
 // Start server

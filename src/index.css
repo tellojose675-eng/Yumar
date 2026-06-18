@@ -1,0 +1,144 @@
+@layer base {
+  body {
+    @apply antialiased text-slate-800 bg-white;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Kafi-style product card */
+.kafi-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.kafi-card:hover {
+  box-shadow: 0 4px 20px rgba(225, 0, 140, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Category nav scrollbar hide */
+.cat-nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+.cat-nav-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e21a83;
+}
+
+/* Keyframes for animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleUp {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Helper Animation Classes */
+.animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Glassmorphism panel styles */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glass-header {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Banner Gradients */
+.banner-gradient {
+  background: linear-gradient(135deg, #fdf2f8 0%, #fae8ff 100%);
+}
+
+.glow-hover:hover {
+  box-shadow: 0 0 15px rgba(226, 26, 131, 0.2);
+}
+
+/* Sticky header stack */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+/* Floating WhatsApp pulse */
+@keyframes waPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.5); }
+  50% { box-shadow: 0 0 0 12px rgba(37, 211, 102, 0); }
+}
+.wa-float {
+  animation: waPulse 2s infinite;
+}

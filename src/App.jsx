@@ -260,7 +260,7 @@ function App() {
   const closeProduct = () => setSelectedProduct(null);
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-white">
+    <div className="min-h-screen flex flex-col font-sans bg-white w-full">
 
       {/* Sticky Header Block */}
       <div className="sticky-header">
@@ -279,7 +279,7 @@ function App() {
 
       {/* Main Header */}
       <header className="bg-white border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 py-3 md:py-4">
+        <div className="w-full px-4 py-3 md:py-4">
           <div className="flex items-center justify-between gap-4">
 
             {/* Left: Social + Mobile menu */}
@@ -388,7 +388,7 @@ function App() {
       {/* Category Navigation Bar */}
       {viewMode === 'shop' && (
         <nav className="bg-[#f5f5f5] border-b border-slate-200 cat-nav-scroll overflow-x-auto">
-          <div className="max-w-7xl mx-auto px-2 flex">
+          <div className="w-full px-2 flex">
             {navCategories.map((cat) => (
               <button
                 key={cat}
@@ -420,7 +420,7 @@ function App() {
       {/* Promo Banner - estilo tienda Kafi */}
       {viewMode === 'shop' && !selectedProduct && (
         <section className="bg-gradient-to-r from-brand/5 via-pink-50 to-brand/5 border-b border-pink-100">
-          <div className="max-w-7xl mx-auto px-4 py-3 md:py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="w-full px-4 py-3 md:py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
             <div>
               <p className="text-xs font-heading font-bold text-brand uppercase tracking-widest">Importaciones directas</p>
               <p className="text-sm md:text-base font-heading font-semibold text-slate-800 mt-0.5">
@@ -446,7 +446,7 @@ function App() {
             /* ===== PRODUCT DETAIL PAGE - estilo Grupo Kafi ===== */
             <div className="animate-fade-in">
               {/* Breadcrumb */}
-              <div className="max-w-7xl mx-auto px-4 py-3 text-xs text-slate-400">
+              <div className="w-full px-4 py-3 text-xs text-slate-400">
                 <button onClick={closeProduct} className="hover:text-brand transition">Inicio</button>
                 <span className="mx-2">/</span>
                 <button
@@ -458,7 +458,7 @@ function App() {
               </div>
 
               {/* Product main layout */}
-              <div className="max-w-7xl mx-auto px-4 pb-8">
+              <div className="w-full px-4 pb-8">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
 
                   {/* Product Image */}
@@ -616,7 +616,7 @@ function App() {
             <>
               {/* Search results indicator */}
               {(appliedSearch || currentCategory !== 'Todos') && (
-                <div className="max-w-7xl mx-auto px-4 pt-4 flex items-center justify-between text-xs text-slate-500">
+                <div className="w-full px-4 pt-4 flex items-center justify-between text-xs text-slate-500">
                   <span>
                     {appliedSearch && <>Resultados para: <strong className="text-slate-800">"{appliedSearch}"</strong></>}
                     {currentCategory !== 'Todos' && !appliedSearch && <>Categoría: <strong className="text-slate-800">{currentCategory}</strong></>}
@@ -628,7 +628,7 @@ function App() {
               )}
 
               {/* Product Grid */}
-              <section className="max-w-7xl mx-auto px-4 w-full py-6 md:py-8 flex-1">
+              <section className="w-full px-4 py-6 md:py-8 flex-1">
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-20">
                     <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
@@ -953,7 +953,7 @@ function App() {
       {/* Trust Badges - estilo Kafi */}
       {viewMode === 'shop' && (
         <section className="bg-slate-900 py-4 md:py-6">
-          <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-y-4 gap-x-2 md:gap-x-4">
+          <div className="w-full px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-y-4 gap-x-2 md:gap-x-4">
             {[
               { title: 'Delivery', sub: 'a todo el Perú', icon: '🚚' },
               { title: 'Tu compra', sub: '100% segura', icon: '🔒' },
@@ -975,7 +975,7 @@ function App() {
 
       {/* Footer - estilo Grupo Kafi con fondo negro */}
       <footer className="bg-slate-900 pt-8 md:pt-10 pb-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        <div className="w-full px-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           <div>
             <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">📞 Teléfono</h4>
             <a href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`} className="text-xs md:text-sm text-white hover:text-brand transition">
@@ -1028,7 +1028,7 @@ function App() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 pt-6 md:pt-8 pb-4 md:pb-6 border-t border-slate-800">
+        <div className="w-full px-4 pt-6 md:pt-8 pb-4 md:pb-6 border-t border-slate-800">
           <div className="text-center">
             <span className="font-cursive text-lg md:text-xl text-brand block mb-2 md:mb-3">YuMar Importaciones</span>
             <p className="text-[9px] md:text-[10px] text-slate-400 font-heading">

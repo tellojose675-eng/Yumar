@@ -41,7 +41,7 @@ function App() {
   const [toast, setToast] = useState({ show: false, message: '' });
 
   // WhatsApp Config
-  const WHATSAPP_NUMBER = "+51944520330"; // Customizable contact phone number for Yumar Importaciones
+  const WHATSAPP_NUMBER = "+51967227469"; // Customizable contact phone number for Yumar Importaciones
 
   // Save cart to local storage
   useEffect(() => {
@@ -979,7 +979,7 @@ function App() {
           <div>
             <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">📞 Teléfono</h4>
             <a href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`} className="text-xs md:text-sm text-white hover:text-brand transition">
-              {WHATSAPP_NUMBER.replace('+51', '')}
+              +51 967 227 469
             </a>
             <h4 className="font-heading font-bold text-xs md:text-sm text-brand mt-3 md:mt-4 mb-2">📧 Correo electrónico</h4>
             <p className="text-xs md:text-sm text-white">contacto@yumarimportaciones.com</p>

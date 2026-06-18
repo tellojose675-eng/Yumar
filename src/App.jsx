@@ -703,7 +703,7 @@ function App() {
         </main>
       ) : (
         // BACKEND / ADMIN VIEW
-        <main className="max-w-6xl mx-auto px-4 w-full py-10 flex-1">
+        <main className="w-full px-4 py-10 flex-1">
           <div className="flex items-center justify-between mb-8 border-b border-slate-200 pb-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-heading font-extrabold text-slate-900">Panel de Control</h1>

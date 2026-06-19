@@ -283,7 +283,7 @@ function App() {
           <div className="flex items-center justify-between gap-4">
 
             {/* Left: Social + Mobile menu */}
-            <div className="flex items-center gap-3 min-w-[120px]">
+            <div className="flex items-center gap-3 flex-shrink-0">
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="md:hidden p-1.5 text-brand"
@@ -321,7 +321,7 @@ function App() {
             </div>
 
             {/* Right: Search, Admin, Cart */}
-            <div className="flex items-center gap-2 md:gap-4 min-w-[120px] justify-end">
+            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0 justify-end">
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
                 className="text-brand hover:opacity-80 transition p-1"

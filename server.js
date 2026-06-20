@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import sqlite3 from 'sqlite3';
+import pg from 'pg';
+const { Pool } = pg;
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -17,23 +18,20 @@ app.use(express.json());
 // Serve static files from the dist directory (for production)
 app.use(express.static(join(__dirname, 'dist')));
 
-// SQLite Database Setup
-const dbPath = join(__dirname, 'mi_base.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('Connected to the SQLite database.');
-    initializeDatabase();
-  }
+// PostgreSQL Database Setup
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/yumar',
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-function initializeDatabase() {
-  db.serialize(() => {
-    // Check if table exists and has the correct schema
-    db.run(`
+const initializeDatabase = async () => {
+  try {
+    console.log('Connected to PostgreSQL database.');
+    
+    // Create table if it doesn't exist
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS productos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         nombre TEXT NOT NULL,
         precio REAL NOT NULL,
         imagen TEXT,
@@ -42,49 +40,20 @@ function initializeDatabase() {
         badge TEXT,
         stock INTEGER DEFAULT 0
       )
-    `, (err) => {
-      if (err) {
-        console.error('Error creating database table:', err.message);
-        return;
-      }
-      
-      // Perform a check to see if we need to migrate/re-seed
-      db.all("PRAGMA table_info(productos)", (err, columns) => {
-        if (err) return;
-        
-        // If the table doesn't have 'imagen' or 'categoria' column, drop and recreate
-        const hasImagen = columns.some(col => col.name === 'imagen');
-        if (!hasImagen) {
-          console.log("Old schema detected. Migrating database table...");
-          db.run("DROP TABLE IF EXISTS productos", () => {
-            initializeDatabase();
-          });
-          return;
-        }
+    `);
 
-        // If the table doesn't have 'stock' column, add it
-        const hasStock = columns.some(col => col.name === 'stock');
-        if (!hasStock) {
-          console.log("Adding stock column to database...");
-          db.run("ALTER TABLE productos ADD COLUMN stock INTEGER DEFAULT 0", (err) => {
-            if (err) console.error('Error adding stock column:', err.message);
-          });
-        }
+    // Check if table is empty and seed if needed
+    const result = await pool.query('SELECT COUNT(*) as count FROM productos');
+    if (result.rows[0].count === 0) {
+      console.log('Database empty. Seeding initial products...');
+      await seedProducts();
+    }
+  } catch (err) {
+    console.error('Error initializing database:', err.message);
+  }
+};
 
-        // Seed products if table is empty
-        db.get("SELECT COUNT(*) as count FROM productos", (err, row) => {
-          if (err) return;
-          if (row.count === 0) {
-            console.log("Database empty. Seeding initial products...");
-            seedProducts();
-          }
-        });
-      });
-    });
-  });
-}
-
-function seedProducts() {
+async function seedProducts() {
   const initialProducts = [
     {
       nombre: "Audífonos Inalámbricos Pro",
@@ -187,121 +156,133 @@ function seedProducts() {
     }
   ];
 
-  const stmt = db.prepare("INSERT INTO productos (nombre, precio, imagen, categoria, descripcion, badge, stock) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  initialProducts.forEach(prod => {
-    stmt.run([prod.nombre, prod.precio, prod.imagen, prod.categoria, prod.descripcion, prod.badge, prod.stock]);
-  });
-  stmt.finalize();
-  console.log("Seeding completed successfully.");
+  try {
+    for (const prod of initialProducts) {
+      await pool.query(
+        "INSERT INTO productos (nombre, precio, imagen, categoria, descripcion, badge, stock) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [prod.nombre, prod.precio, prod.imagen, prod.categoria, prod.descripcion, prod.badge, prod.stock]
+      );
+    }
+    console.log("Seeding completed successfully.");
+  } catch (err) {
+    console.error('Error seeding products:', err.message);
+  }
 }
 
 // API Routes
 
 // GET /api/productos - Get all products with optional filters
-app.get('/api/productos', (req, res) => {
-  const { categoria, q } = req.query;
-  
-  let query = "SELECT * FROM productos";
-  let params = [];
-  
-  if (categoria && q) {
-    query += " WHERE categoria = ? AND (nombre LIKE ? OR descripcion LIKE ?)";
-    params = [categoria, `%${q}%`, `%${q}%`];
-  } else if (categoria) {
-    query += " WHERE categoria = ?";
-    params = [categoria];
-  } else if (q) {
-    query += " WHERE nombre LIKE ? OR descripcion LIKE ?";
-    params = [`%${q}%`, `%${q}%`];
-  }
-
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+app.get('/api/productos', async (req, res) => {
+  try {
+    const { categoria, q } = req.query;
+    
+    let query = "SELECT * FROM productos";
+    let params = [];
+    let paramCount = 0;
+    
+    if (categoria && q) {
+      query += ` WHERE categoria = $${++paramCount} AND (nombre LIKE $${++paramCount} OR descripcion LIKE $${++paramCount})`;
+      params = [categoria, `%${q}%`, `%${q}%`];
+    } else if (categoria) {
+      query += ` WHERE categoria = $${++paramCount}`;
+      params = [categoria];
+    } else if (q) {
+      query += ` WHERE nombre LIKE $${++paramCount} OR descripcion LIKE $${++paramCount}`;
+      params = [`%${q}%`, `%${q}%`];
     }
-    res.json(rows);
-  });
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching products:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/productos/:id - Get a single product
-app.get('/api/productos/:id', (req, res) => {
-  const { id } = req.params;
-  db.get("SELECT * FROM productos WHERE id = ?", [id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (!row) {
+app.get('/api/productos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("SELECT * FROM productos WHERE id = $1", [id]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Product not found" });
     }
-    res.json(row);
-  });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching product:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/productos - Add a new product
-app.post('/api/productos', (req, res) => {
-  const { nombre, precio, imagen, categoria, descripcion, badge, stock } = req.body;
+app.post('/api/productos', async (req, res) => {
+  try {
+    const { nombre, precio, imagen, categoria, descripcion, badge, stock } = req.body;
 
-  console.log('Datos recibidos:', { nombre, precio, stock, tipo: typeof stock });
+    console.log('Datos recibidos:', { nombre, precio, stock, tipo: typeof stock });
 
-  if (!nombre || precio === undefined) {
-    return res.status(400).json({ error: "Nombre and precio are required" });
-  }
-
-  const defaultImage = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&q=80"; // Tech placeholder
-  const finalImage = imagen || defaultImage;
-  const finalCategory = categoria || "Tecnología";
-  const finalDesc = descripcion || "Producto importado de alta calidad.";
-  const finalBadge = badge || "";
-  const finalStock = stock !== undefined && stock !== '' ? parseInt(stock) : 0;
-
-  console.log('Stock final a guardar:', finalStock);
-
-  db.run(
-    "INSERT INTO productos (nombre, precio, imagen, categoria, descripcion, badge, stock) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [nombre, precio, finalImage, finalCategory, finalDesc, finalBadge, finalStock],
-    function (err) {
-      if (err) {
-        console.error('Error al guardar:', err);
-        return res.status(500).json({ error: err.message });
-      }
-
-      console.log('Producto guardado con ID:', this.lastID, 'y stock:', finalStock);
-
-      res.json({
-        id: this.lastID,
-        nombre,
-        precio,
-        imagen: finalImage,
-        categoria: finalCategory,
-        descripcion: finalDesc,
-        badge: finalBadge,
-        stock: finalStock
-      });
+    if (!nombre || precio === undefined) {
+      return res.status(400).json({ error: "Nombre and precio are required" });
     }
-  );
+
+    const defaultImage = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&q=80";
+    const finalImage = imagen || defaultImage;
+    const finalCategory = categoria || "Tecnología";
+    const finalDesc = descripcion || "Producto importado de alta calidad.";
+    const finalBadge = badge || "";
+    const finalStock = stock !== undefined && stock !== '' ? parseInt(stock) : 0;
+
+    console.log('Stock final a guardar:', finalStock);
+
+    const result = await pool.query(
+      "INSERT INTO productos (nombre, precio, imagen, categoria, descripcion, badge, stock) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+      [nombre, precio, finalImage, finalCategory, finalDesc, finalBadge, finalStock]
+    );
+
+    console.log('Producto guardado con ID:', result.rows[0].id, 'y stock:', finalStock);
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error al guardar:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // DELETE /api/productos/:id - Delete a product
-app.delete('/api/productos/:id', (req, res) => {
-  const { id } = req.params;
-
-  db.run("DELETE FROM productos WHERE id = ?", [id], function (err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (this.changes === 0) {
+app.delete('/api/productos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("DELETE FROM productos WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Product not found" });
     }
     res.json({ message: "Product deleted successfully", id });
-  });
+  } catch (err) {
+    console.error('Error deleting product:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Catch-all route for SPA (Single Page Application)
-app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, 'dist', 'index.html'));
-});
+// Catch-all route for SPA (Single Page Application) - only in production
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, 'dist', 'index.html'));
+  });
+}
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  initializeDatabase().then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+    });
+  }).catch(err => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  });
+} else {
+  // In Vercel, we just initialize DB asynchronously and export the app
+  initializeDatabase().catch(console.error);
+}
+
+export default app;

@@ -15,11 +15,16 @@
 
 /* Kafi-style product card */
 .kafi-card {
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+  border-radius: 8px;
+  border: 1px solid transparent;
 }
 .kafi-card:hover {
-  box-shadow: 0 4px 20px rgba(225, 0, 140, 0.08);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 170, 230, 0.20), 0 2px 8px rgba(0,0,0,0.10);
+  transform: translateY(-6px) scale(1.02);
+  border-color: rgba(14, 165, 233, 0.25);
+  z-index: 2;
+  position: relative;
 }
 
 /* Category nav scrollbar hide */

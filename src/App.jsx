@@ -17,8 +17,17 @@ function App() {
   
   // Modals & Views
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [viewMode, setViewMode] = useState('shop'); // 'shop' or 'admin'
+  const [viewMode, setViewMode] = useState('shop'); // 'shop', 'admin' or 'reclamaciones'
   const [detailQuantity, setDetailQuantity] = useState(1);
+
+  // Reclamaciones Form State
+  const [reclamo, setReclamo] = useState({
+    nombre: '', tipoDoc: 'DNI', numDoc: '', direccion: '', departamento: '',
+    provincia: '', distrito: '', telefono: '', telefonoFijo: '', correo: '',
+    tipoBien: 'Producto', monto: '', descripcion: '',
+    tipoReclamo: 'Queja', motivo: '', privacidad: false
+  });
+  const [reclamoEnviado, setReclamoEnviado] = useState(false);
   
   // Cart State (stored in localStorage)
   const [cart, setCart] = useState(() => {
@@ -237,6 +246,52 @@ function App() {
     }
   };
 
+  const handleReclamoSubmit = async (e) => {
+    e.preventDefault();
+    if (!reclamo.privacidad) {
+      showToast('Debes aceptar la política de privacidad');
+      return;
+    }
+    
+    try {
+      // 1. Save to DB
+      const res = await fetch('/api/reclamos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reclamo)
+      });
+      
+      if (!res.ok) {
+        throw new Error('Error al guardar reclamo en el servidor');
+      }
+
+      // 2. Generate WhatsApp Link
+      let waText = `*NUEVO ${reclamo.tipoReclamo.toUpperCase()} - Libro de Reclamaciones* 📘\n\n`;
+      waText += `*Datos del Cliente:*\n`;
+      waText += `- Nombre: ${reclamo.nombre}\n`;
+      waText += `- Documento: ${reclamo.tipoDoc} ${reclamo.numDoc}\n`;
+      waText += `- Teléfono: ${reclamo.telefono}\n`;
+      waText += `- Correo: ${reclamo.correo}\n\n`;
+      waText += `*Detalle del Reclamo:*\n`;
+      waText += `- Tipo de Bien: ${reclamo.tipoBien}\n`;
+      if (reclamo.monto) waText += `- Monto Reclamado: S/ ${reclamo.monto}\n`;
+      waText += `- Descripción: ${reclamo.descripcion}\n`;
+      waText += `- Motivo: ${reclamo.motivo}\n`;
+      
+      const waLink = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(waText)}`;
+      
+      // Open WhatsApp in new tab
+      window.open(waLink, '_blank');
+      
+      // 3. Update UI state
+      setReclamoEnviado(true);
+      
+    } catch (err) {
+      console.error(err);
+      showToast("Hubo un error al procesar el reclamo. Por favor, intenta de nuevo.");
+    }
+  };
+
   // Computed Values
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.precio * item.quantity, 0);
@@ -295,13 +350,11 @@ function App() {
               </button>
               <div className="hidden md:flex items-center gap-2">
                 <span className="text-sm text-slate-600 font-medium">¡Síguenos!</span>
-                <a href="#" className="text-brand hover:opacity-80 transition" aria-label="Facebook">
+                <a href="https://www.facebook.com/share/1BqZay682t/" target="_blank" rel="noreferrer" className="text-brand hover:opacity-80 transition" aria-label="Facebook">
                   <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                 </a>
-                <a href="#" className="text-brand hover:opacity-80 transition" aria-label="Instagram">
-                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
-                </a>
-                <a href="#" className="text-brand hover:opacity-80 transition" aria-label="TikTok">
+
+                <a href="https://www.tiktok.com/@yumar.importacion?_r=1&_t=ZS-97QaykM2SKl" target="_blank" rel="noreferrer" className="text-brand hover:opacity-80 transition" aria-label="TikTok">
                   <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
                 </a>
               </div>
@@ -320,47 +373,52 @@ function App() {
               </span>
             </div>
 
-            {/* Right: Search, Admin, Cart */}
-            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0 justify-end">
+            {/* Right: Search, Mi Cuenta, Cart */}
+            <div className="flex items-center gap-1 md:gap-3 flex-shrink-0 justify-end">
+
+              {/* Search */}
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
-                className="text-brand hover:opacity-80 transition p-1"
+                className="p-2 rounded-full hover:bg-pink-50 transition group"
                 aria-label="Buscar"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6" style={{ color: '#0ea5e9' }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.637Z" />
                 </svg>
               </button>
 
+              {/* MI CUENTA / Admin */}
               <button
                 onClick={() => setViewMode(prev => prev === 'shop' ? 'admin' : 'shop')}
-                className={`hidden sm:flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wide transition ${
-                  viewMode === 'admin' ? 'text-brand' : 'text-slate-600 hover:text-brand'
-                }`}
+                className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition group"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6" style={{ color: '#0ea5e9' }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                 </svg>
-                {viewMode === 'admin' ? 'Tienda' : 'Admin'}
+                <span className="text-xs font-heading font-bold uppercase tracking-wide" style={{ color: '#0ea5e9' }}>
+                  {viewMode === 'admin' ? 'Tienda' : 'Mi Cuenta'}
+                </span>
               </button>
 
+              {/* Cart */}
               <button
                 onClick={() => setCartOpen(true)}
-                className="relative flex items-center gap-1.5 text-brand hover:opacity-80 transition"
+                className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-orange-50 transition"
                 aria-label="Carrito"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 md:w-7 md:h-7" style={{ color: '#0ea5e9' }}>
+                  <path d="M2.25 2.25a.75.75 0 0 0 0 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 0 0-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 0 0 0-1.5H5.378A2.25 2.25 0 0 1 7.5 15h11.218a.75.75 0 0 0 .674-.421 60.358 60.358 0 0 0 2.96-7.228.75.75 0 0 0-.525-.965A60.864 60.864 0 0 0 5.68 4.509l-.232-.867A1.875 1.875 0 0 0 3.636 2.25H2.25ZM16.5 18a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM7.5 19.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z" />
                 </svg>
-                <span className="text-sm font-heading font-bold hidden sm:inline">
+                <span className="text-sm font-heading font-bold hidden sm:inline text-slate-700">
                   S/ {cartTotal.toFixed(2)}
                 </span>
                 {cartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-brand text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                  <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-brand text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow">
                     {cartCount}
                   </span>
                 )}
               </button>
+
             </div>
           </div>
         </div>
@@ -628,7 +686,26 @@ function App() {
               )}
 
               {/* Product Grid */}
-              <section className="w-full px-4 py-6 md:py-8 flex-1">
+              <section className="w-full px-4 py-6 md:py-8 flex-1 relative">
+                {/* Marca de agua - cubre todo el área de productos */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                  opacity: 0.22,
+                  minHeight: '400px',
+                }}>
+                  <img src="/logo.png" alt="" style={{ width: '70%', maxWidth: '700px', height: 'auto', objectFit: 'contain' }} />
+                </div>
+
+                <div style={{ position: 'relative', zIndex: 1 }}>
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-20">
                     <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
@@ -650,7 +727,7 @@ function App() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-5">
                     {products.map((product) => (
                       <div key={product.id} className="kafi-card bg-white group">
                         <div
@@ -696,10 +773,104 @@ function App() {
                     ))}
                   </div>
                 )}
+                </div>
               </section>
             </>
           )}
 
+        </main>
+      ) : viewMode === 'reclamaciones' ? (
+        /* ===== LIBRO DE RECLAMACIONES ===== */
+        <main className="w-full max-w-3xl mx-auto px-4 py-10 flex-1">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl md:text-3xl font-heading font-extrabold text-slate-900 uppercase tracking-wide">Libro de Reclamaciones</h1>
+            <button onClick={() => setViewMode('shop')} className="text-brand text-sm font-heading font-semibold hover:underline flex items-center gap-1">
+              ← Regresar a la tienda
+            </button>
+          </div>
+
+          {reclamoEnviado ? (
+            <div className="text-center py-20 bg-brand/5 rounded-2xl border border-brand/20">
+              <div className="text-5xl mb-4">✅</div>
+              <h2 className="text-xl font-heading font-bold text-slate-800">Reclamo enviado correctamente</h2>
+              <p className="text-sm text-slate-500 mt-2">Nos comunicaremos contigo en un plazo máximo de 30 días calendario.</p>
+              <button onClick={() => { setReclamoEnviado(false); setViewMode('shop'); }} className="mt-6 bg-brand text-white font-heading font-bold px-6 py-2.5 rounded-lg hover:bg-brand-hover transition">
+                Volver a la tienda
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleReclamoSubmit} className="space-y-6">
+
+              {/* Sección 1 */}
+              <div>
+                <p className="font-heading font-bold text-slate-800 text-sm uppercase tracking-wide mb-3">Datos de la persona que presenta el reclamo:</p>
+                <div className="space-y-3">
+                  <input required placeholder="Nombre completo / Razón social*" value={reclamo.nombre} onChange={e => setReclamo(p=>({...p, nombre: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <select value={reclamo.tipoDoc} onChange={e => setReclamo(p=>({...p, tipoDoc: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm bg-white focus:outline-none focus:border-brand">
+                    <option>DNI</option><option>RUC</option><option>CE</option><option>Pasaporte</option>
+                  </select>
+                  <input required placeholder="N°" value={reclamo.numDoc} onChange={e => setReclamo(p=>({...p, numDoc: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <input required placeholder="Dirección*" value={reclamo.direccion} onChange={e => setReclamo(p=>({...p, direccion: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <input required placeholder="Departamento*" value={reclamo.departamento} onChange={e => setReclamo(p=>({...p, departamento: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <input required placeholder="Provincia*" value={reclamo.provincia} onChange={e => setReclamo(p=>({...p, provincia: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <input required placeholder="Distrito*" value={reclamo.distrito} onChange={e => setReclamo(p=>({...p, distrito: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <input required placeholder="Teléfono*" value={reclamo.telefono} onChange={e => setReclamo(p=>({...p, telefono: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <input placeholder="Teléfono fijo" value={reclamo.telefonoFijo} onChange={e => setReclamo(p=>({...p, telefonoFijo: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <input required type="email" placeholder="Correo*" value={reclamo.correo} onChange={e => setReclamo(p=>({...p, correo: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                </div>
+              </div>
+
+              {/* Sección 2 */}
+              <div>
+                <p className="font-heading font-bold text-slate-800 text-sm uppercase tracking-wide mb-3">Información General:</p>
+                <p className="text-xs text-slate-500 mb-2">Identificación del bien contratado:</p>
+                <div className="space-y-3">
+                  <select value={reclamo.tipoBien} onChange={e => setReclamo(p=>({...p, tipoBien: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm bg-white focus:outline-none focus:border-brand">
+                    <option>Producto</option><option>Servicio</option>
+                  </select>
+                  <input placeholder="Monto reclamado" value={reclamo.monto} onChange={e => setReclamo(p=>({...p, monto: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand" />
+                  <textarea placeholder="Descripción" rows={4} value={reclamo.descripcion} onChange={e => setReclamo(p=>({...p, descripcion: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand resize-y" />
+                </div>
+              </div>
+
+              {/* Sección 3 */}
+              <div>
+                <p className="font-heading font-bold text-slate-800 text-sm uppercase tracking-wide mb-3">Detalle de su reclamo:</p>
+                <div className="space-y-3">
+                  <select value={reclamo.tipoReclamo} onChange={e => setReclamo(p=>({...p, tipoReclamo: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm bg-white focus:outline-none focus:border-brand">
+                    <option>Queja</option><option>Reclamo</option>
+                  </select>
+                  <textarea required placeholder="Detallar motivo*" rows={4} value={reclamo.motivo} onChange={e => setReclamo(p=>({...p, motivo: e.target.value}))} className="w-full px-4 py-3 border border-slate-200 rounded text-sm focus:outline-none focus:border-brand resize-y" />
+                </div>
+              </div>
+
+              {/* Política y botón */}
+              <div className="space-y-4">
+                <div className="flex items-start gap-2">
+                  <input type="checkbox" id="privacidad" checked={reclamo.privacidad} onChange={e => setReclamo(p=>({...p, privacidad: e.target.checked}))} className="mt-0.5 accent-brand" />
+                  <label htmlFor="privacidad" className="text-sm text-slate-600">
+                    <span className="text-brand font-medium cursor-pointer">Política de privacidad</span> — Acepto la política de privacidad
+                  </label>
+                </div>
+                <button type="submit" className="bg-brand hover:bg-brand-hover text-white font-heading font-bold uppercase tracking-wide px-8 py-3 rounded transition">
+                  ENVIAR
+                </button>
+                <div>
+                  <button type="button" onClick={() => setViewMode('shop')} className="text-sm text-brand hover:underline flex items-center gap-1">
+                    Regresar a la tienda 🛒
+                  </button>
+                </div>
+              </div>
+
+              {/* Texto legal */}
+              <div className="border-t border-slate-100 pt-6 space-y-3 text-sm text-slate-600">
+                <p><span className="font-bold text-slate-800">RECLAMO:</span> Disconformidad relacionada a los productos o servicios.</p>
+                <p><span className="font-bold text-slate-800">QUEJA:</span> Disconformidad no relacionada a los productos o servicios o malestar o descontento respecto a la atención al público.</p>
+                <p className="text-xs text-slate-500 leading-relaxed">La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI. El proveedor deberá dar respuesta al reclamo en un plazo no mayor de treinta (30) días calendario, pudiendo ampliar el plazo hasta por treinta (30) días más, previa comunicación al consumidor.</p>
+              </div>
+
+            </form>
+          )}
         </main>
       ) : (
         // BACKEND / ADMIN VIEW
@@ -961,7 +1132,16 @@ function App() {
               { title: 'Clientes', sub: 'satisfechos', icon: '⭐' },
               { title: 'Libro de', sub: 'reclamaciones', icon: '📖' },
             ].map((item) => (
-              <div key={item.title} className="flex flex-row items-center space-x-2">
+              <div
+                key={item.title}
+                className={`flex flex-row items-center space-x-2 ${item.title === 'Libro de' ? 'cursor-pointer hover:opacity-80 transition' : ''}`}
+                onClick={() => {
+                  if (item.title === 'Libro de') {
+                    setViewMode('reclamaciones');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+              >
                 <span className="text-2xl">{item.icon}</span>
                 <div className="flex flex-col items-start">
                   <h4 className="font-heading font-bold text-sm text-brand">{item.title}</h4>
@@ -982,7 +1162,9 @@ function App() {
               +51 967 227 469
             </a>
             <h4 className="font-heading font-bold text-xs md:text-sm text-brand mt-3 md:mt-4 mb-2">📧 Correo electrónico</h4>
-            <p className="text-xs md:text-sm text-white">contacto@yumarimportaciones.com</p>
+            <a href="mailto:Yumarperu@gmail.com" className="text-xs md:text-sm text-white hover:text-brand transition block">
+              Yumarperu@gmail.com
+            </a>
           </div>
 
           <div>
@@ -1008,6 +1190,14 @@ function App() {
               <li><span className="hover:text-brand cursor-pointer">Políticas de privacidad</span></li>
               <li><span className="hover:text-brand cursor-pointer">Medios de pago</span></li>
               <li><span className="hover:text-brand cursor-pointer">Sobre los envíos</span></li>
+              <li>
+                <button
+                  onClick={() => { setViewMode('reclamaciones'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="hover:text-brand transition text-left"
+                >
+                  📖 Libro de reclamaciones
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -1270,17 +1460,44 @@ function App() {
 
       {/* PRODUCT DETAIL MODAL - removed, now inline page view */}
 
-      {/* FLOATING WHATSAPP BUTTON */}
+      {/* FLOATING WHATSAPP BUTTON con popup */}
       {viewMode === 'shop' && (
-        <a
-          href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=Hola,%20necesito%20información%20sobre%20sus%20productos.`}
-          target="_blank"
-          rel="noreferrer"
-          className="fixed bottom-5 right-5 z-40 w-14 h-14 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-full flex items-center justify-center shadow-lg wa-float transition-transform hover:scale-105"
-          aria-label="WhatsApp"
-        >
-          <svg className="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
-        </a>
+        <div className="fixed bottom-5 right-5 z-40 flex flex-row items-center gap-2">
+
+          {/* Burbuja de mensaje - a la izquierda del botón */}
+          <div className="relative animate-fade-in">
+            <div className="bg-white rounded-2xl rounded-br-sm shadow-xl px-4 py-3 border border-slate-100" style={{ maxWidth: '190px' }}>
+              <p className="text-sm text-slate-700 leading-snug">
+                ¿Hola, cómo <span className="font-semibold text-[#25D366]">podemos</span> ayudarte?
+              </p>
+            </div>
+            {/* Flecha apuntando a la derecha hacia el botón WhatsApp */}
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              right: '-8px',
+              transform: 'translateY(-50%)',
+              width: 0,
+              height: 0,
+              borderTop: '8px solid transparent',
+              borderBottom: '8px solid transparent',
+              borderLeft: '9px solid white',
+              filter: 'drop-shadow(2px 0 2px rgba(0,0,0,0.06))',
+            }} />
+          </div>
+
+          {/* Botón WhatsApp - a la derecha */}
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=Hola,%20¿cómo%20podemos%20ayudarte?`}
+            target="_blank"
+            rel="noreferrer"
+            className="w-14 h-14 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-full flex items-center justify-center shadow-lg wa-float transition-transform hover:scale-105 flex-shrink-0"
+            aria-label="WhatsApp"
+          >
+            <svg className="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
+          </a>
+
+        </div>
       )}
 
       {/* FLOATING TOAST SYSTEM */}
@@ -1290,6 +1507,7 @@ function App() {
           <span>{toast.message}</span>
         </div>
       )}
+
 
     </div>
   );

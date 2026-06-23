@@ -42,6 +42,28 @@ const initializeDatabase = async () => {
       )
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reclamos (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        tipo_doc TEXT,
+        num_doc TEXT,
+        direccion TEXT,
+        departamento TEXT,
+        provincia TEXT,
+        distrito TEXT,
+        telefono TEXT,
+        telefono_fijo TEXT,
+        correo TEXT,
+        tipo_bien TEXT,
+        monto TEXT,
+        descripcion TEXT,
+        tipo_reclamo TEXT,
+        motivo TEXT,
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Check if table is empty and seed if needed
     const result = await pool.query('SELECT COUNT(*) as count FROM productos');
     if (result.rows[0].count === 0) {
@@ -259,6 +281,36 @@ app.delete('/api/productos/:id', async (req, res) => {
     res.json({ message: "Product deleted successfully", id });
   } catch (err) {
     console.error('Error deleting product:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/reclamos - Add a new reclamo
+app.post('/api/reclamos', async (req, res) => {
+  try {
+    const {
+      nombre, tipoDoc, numDoc, direccion, departamento, provincia, distrito,
+      telefono, telefonoFijo, correo, tipoBien, monto, descripcion, tipoReclamo, motivo
+    } = req.body;
+
+    if (!nombre || !numDoc || !correo || !motivo) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO reclamos (
+        nombre, tipo_doc, num_doc, direccion, departamento, provincia, distrito,
+        telefono, telefono_fijo, correo, tipo_bien, monto, descripcion, tipo_reclamo, motivo
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+      [
+        nombre, tipoDoc, numDoc, direccion, departamento, provincia, distrito,
+        telefono, telefonoFijo, correo, tipoBien, monto, descripcion, tipoReclamo, motivo
+      ]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error saving reclamo:', err);
     res.status(500).json({ error: err.message });
   }
 });

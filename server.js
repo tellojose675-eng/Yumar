@@ -315,6 +315,17 @@ app.post('/api/reclamos', async (req, res) => {
   }
 });
 
+// GET /api/reclamos - Get all reclamos
+app.get('/api/reclamos', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM reclamos ORDER BY fecha DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching reclamos:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Catch-all route for SPA (Single Page Application) - only in production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {

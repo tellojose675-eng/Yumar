@@ -45,6 +45,8 @@ function App() {
     badge: 'NUEVO INGRESO',
     stock: 0
   });
+  const [adminTab, setAdminTab] = useState('productos');
+  const [reclamosList, setReclamosList] = useState([]);
   
   // Toast Alert State
   const [toast, setToast] = useState({ show: false, message: '' });
@@ -102,6 +104,19 @@ function App() {
   useEffect(() => {
     fetchAllProducts();
   }, []);
+
+  const fetchReclamosList = async () => {
+    try {
+      const res = await fetch('/api/reclamos');
+      if (res.ok) setReclamosList(await res.json());
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'admin') fetchReclamosList();
+  }, [viewMode]);
 
   // Toast triggers
   const showToast = (message) => {
@@ -265,25 +280,7 @@ function App() {
         throw new Error('Error al guardar reclamo en el servidor');
       }
 
-      // 2. Generate WhatsApp Link
-      let waText = `*NUEVO ${reclamo.tipoReclamo.toUpperCase()} - Libro de Reclamaciones* 📘\n\n`;
-      waText += `*Datos del Cliente:*\n`;
-      waText += `- Nombre: ${reclamo.nombre}\n`;
-      waText += `- Documento: ${reclamo.tipoDoc} ${reclamo.numDoc}\n`;
-      waText += `- Teléfono: ${reclamo.telefono}\n`;
-      waText += `- Correo: ${reclamo.correo}\n\n`;
-      waText += `*Detalle del Reclamo:*\n`;
-      waText += `- Tipo de Bien: ${reclamo.tipoBien}\n`;
-      if (reclamo.monto) waText += `- Monto Reclamado: S/ ${reclamo.monto}\n`;
-      waText += `- Descripción: ${reclamo.descripcion}\n`;
-      waText += `- Motivo: ${reclamo.motivo}\n`;
-      
-      const waLink = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(waText)}`;
-      
-      // Open WhatsApp in new tab
-      window.open(waLink, '_blank');
-      
-      // 3. Update UI state
+      // 2. Update UI state
       setReclamoEnviado(true);
       
     } catch (err) {
@@ -888,7 +885,23 @@ function App() {
             </button>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="flex gap-4 mb-6 border-b border-slate-200">
+            <button 
+              onClick={() => setAdminTab('productos')}
+              className={`pb-3 font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'productos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+            >
+              Inventario de Productos
+            </button>
+            <button 
+              onClick={() => { setAdminTab('reclamos'); fetchReclamosList(); }}
+              className={`pb-3 font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'reclamos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+            >
+              Libro de Reclamaciones
+            </button>
+          </div>
+
+          {adminTab === 'productos' ? (
+            <div className="grid lg:grid-cols-3 gap-8">
             
             {/* Left Col: Add Product Form */}
             <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
@@ -1116,6 +1129,66 @@ function App() {
                 </div>
               </div>
             </div>
+
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-heading font-bold text-slate-900">Listado de Reclamos y Quejas</h3>
+                <button 
+                  onClick={() => fetchReclamosList()}
+                  className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1"
+                >
+                  Actualizar
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
+                      <th className="px-6 py-3">Fecha</th>
+                      <th className="px-6 py-3">Cliente</th>
+                      <th className="px-6 py-3">Contacto</th>
+                      <th className="px-6 py-3">Tipo</th>
+                      <th className="px-6 py-3">Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {reclamosList.map((rec) => (
+                      <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors align-top">
+                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                          {new Date(rec.fecha).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <p className="font-medium text-slate-800">{rec.nombre}</p>
+                          <p className="text-xs text-slate-500">{rec.tipo_doc} {rec.num_doc}</p>
+                        </td>
+                        <td className="px-6 py-3.5 text-slate-600 text-xs">
+                          <p>📱 {rec.telefono}</p>
+                          <p>✉️ {rec.correo}</p>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${rec.tipo_reclamo === 'Queja' ? 'bg-orange-100 text-orange-700' : 'bg-rose-100 text-rose-700'}`}>
+                            {rec.tipo_reclamo}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3.5 text-xs text-slate-600 max-w-xs">
+                          <p className="line-clamp-2" title={rec.motivo}>{rec.motivo}</p>
+                        </td>
+                      </tr>
+                    ))}
+                    {reclamosList.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
+                          No hay reclamos registrados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           </div>
         </main>

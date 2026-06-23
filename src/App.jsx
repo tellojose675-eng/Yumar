@@ -765,8 +765,8 @@ function App() {
                     <button
                       onClick={() => {
                         addToCart(selectedProduct, detailQuantity);
-                        const itemText = `*COMPRA - YuMar Importaciones*\n\nHola, quiero comprar:\n\n*${selectedProduct.nombre}*\nCant: ${detailQuantity}\nPrecio Unit: S/ ${selectedProduct.precio.toFixed(2)}\nTotal: *S/ ${(selectedProduct.precio * detailQuantity).toFixed(2)}*\n\nPor favor confírmenme disponibilidad.`;
-                        window.open(`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(itemText)}`, '_blank');
+                        setCartOpen(true);
+                        showToast("Por favor, completa tus datos para finalizar la compra.");
                       }}
                       className="mt-4 w-full bg-brand hover:bg-brand-hover text-white font-heading font-bold text-sm py-3.5 rounded transition uppercase tracking-wide"
                     >

@@ -47,6 +47,19 @@ function App() {
   });
   const [adminTab, setAdminTab] = useState('productos');
   const [reclamosList, setReclamosList] = useState([]);
+  const [pedidosList, setPedidosList] = useState([]);
+  const [resenasList, setResenasList] = useState([]);
+
+  // Login State
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+
+  // Checkout State
+  const [checkoutForm, setCheckoutForm] = useState({ nombre: '', telefono: '', correo: '' });
+  
+  // Reseñas State
+  const [productResenas, setProductResenas] = useState([]);
+  const [resenaForm, setResenaForm] = useState({ autor: '', calificacion: 5, comentario: '' });
   
   // Toast Alert State
   const [toast, setToast] = useState({ show: false, message: '' });
@@ -109,14 +122,37 @@ function App() {
     try {
       const res = await fetch('/api/reclamos');
       if (res.ok) setReclamosList(await res.json());
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
+  };
+
+  const fetchPedidosList = async () => {
+    try {
+      const res = await fetch('/api/pedidos');
+      if (res.ok) setPedidosList(await res.json());
+    } catch { /* ignore */ }
+  };
+
+  const fetchAdminResenas = async () => {
+    try {
+      const res = await fetch('/api/resenas');
+      if (res.ok) setResenasList(await res.json());
+    } catch { /* ignore */ }
+  };
+
+  const fetchProductResenas = async (id) => {
+    try {
+      const res = await fetch(`/api/resenas/producto/${id}`);
+      if (res.ok) setProductResenas(await res.json());
+    } catch { /* ignore */ }
   };
 
   useEffect(() => {
-    if (viewMode === 'admin') fetchReclamosList();
-  }, [viewMode]);
+    if (viewMode === 'admin' && isAdminAuthenticated) {
+      if (adminTab === 'reclamos') fetchReclamosList();
+      if (adminTab === 'pedidos') fetchPedidosList();
+      if (adminTab === 'resenas') fetchAdminResenas();
+    }
+  }, [viewMode, isAdminAuthenticated, adminTab]);
 
   // Toast triggers
   const showToast = (message) => {
@@ -172,27 +208,52 @@ function App() {
     setAppliedSearch('');
   };
 
-  // WhatsApp Checkout Url Generation
-  const getWhatsAppLink = () => {
-    if (cart.length === 0) return '#';
+  const handleCheckout = async (e) => {
+    e.preventDefault();
+    if (!checkoutForm.nombre || !checkoutForm.telefono) {
+      showToast("Por favor ingresa tu nombre y teléfono.");
+      return;
+    }
     
-    let text = `*🛍️ NUEVO PEDIDO - YuMar Importaciones*\n\n`;
-    text += `Hola, quiero realizar un pedido de los siguientes productos:\n\n`;
-    
-    let subtotal = 0;
-    cart.forEach((item, index) => {
-      const itemTotal = item.precio * item.quantity;
-      subtotal += itemTotal;
-      text += `*${index + 1}. ${item.nombre}*\n`;
-      text += `   Cant: ${item.quantity} | P. Unit: S/ ${item.precio.toFixed(2)}\n`;
-      text += `   Subtotal: *S/ ${itemTotal.toFixed(2)}*\n\n`;
-    });
-    
-    text += `-----------------------------------\n`;
-    text += `*💰 TOTAL A PAGAR: S/ ${subtotal.toFixed(2)}*\n\n`;
-    text += `Por favor, confírmenme la disponibilidad y los métodos de pago. ¡Gracias!`;
-    
-    return `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(text)}`;
+    try {
+      // Save order to DB
+      await fetch('/api/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...checkoutForm,
+          total: cartTotal,
+          detalles: cart
+        })
+      });
+      
+      // WhatsApp message
+      let text = `*🛍️ NUEVO PEDIDO - YuMar Importaciones*\n\n`;
+      text += `*Cliente:* ${checkoutForm.nombre}\n`;
+      text += `*Teléfono:* ${checkoutForm.telefono}\n\n`;
+      text += `Hola, quiero realizar un pedido de los siguientes productos:\n\n`;
+      
+      let subtotal = 0;
+      cart.forEach((item, index) => {
+        const itemTotal = item.precio * item.quantity;
+        subtotal += itemTotal;
+        text += `*${index + 1}. ${item.nombre}*\n`;
+        text += `   Cant: ${item.quantity} | P. Unit: S/ ${item.precio.toFixed(2)}\n`;
+        text += `   Subtotal: *S/ ${itemTotal.toFixed(2)}*\n\n`;
+      });
+      
+      text += `-----------------------------------\n`;
+      text += `*💰 TOTAL A PAGAR: S/ ${subtotal.toFixed(2)}*\n\n`;
+      text += `Por favor, confírmenme la disponibilidad y los métodos de pago. ¡Gracias!`;
+      
+      window.open(`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(text)}`, '_blank');
+      
+      setCart([]);
+      setCartOpen(false);
+      showToast("Pedido registrado correctamente.");
+    } catch (err) {
+      showToast("Error al procesar el pedido.");
+    }
   };
 
   // Admin Panel Actions
@@ -289,6 +350,75 @@ function App() {
     }
   };
 
+  const handleResenaSubmit = async (e) => {
+    e.preventDefault();
+    if (!resenaForm.autor || !resenaForm.comentario) return;
+
+    try {
+      const res = await fetch('/api/resenas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          producto_id: selectedProduct.id,
+          ...resenaForm
+        })
+      });
+      if (res.ok) {
+        showToast("¡Gracias por tu reseña!");
+        setResenaForm({ autor: '', calificacion: 5, comentario: '' });
+        fetchProductResenas(selectedProduct.id);
+      }
+    } catch (err) {
+      showToast("Error al enviar reseña.");
+    }
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
+      setIsAdminAuthenticated(true);
+      showToast("Bienvenido al Panel de Control");
+    } else {
+      showToast("Credenciales incorrectas");
+    }
+  };
+
+  const updateEstadoReclamo = async (id, estado) => {
+    try {
+      await fetch(`/api/reclamos/${id}/estado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado })
+      });
+      fetchReclamosList();
+      showToast("Estado de reclamo actualizado");
+    } catch (err) { showToast("Error al actualizar estado"); }
+  };
+
+  const updateEstadoPedido = async (id, estado) => {
+    try {
+      await fetch(`/api/pedidos/${id}/estado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado })
+      });
+      fetchPedidosList();
+      showToast("Estado de pedido actualizado");
+    } catch (err) { showToast("Error al actualizar estado"); }
+  };
+
+  const updateAprobacionResena = async (id, aprobado) => {
+    try {
+      await fetch(`/api/resenas/${id}/aprobado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aprobado })
+      });
+      fetchAdminResenas();
+      showToast("Estado de reseña actualizado");
+    } catch (err) { showToast("Error al actualizar estado"); }
+  };
+
   // Computed Values
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.precio * item.quantity, 0);
@@ -306,6 +436,8 @@ function App() {
   const openProduct = (product) => {
     setSelectedProduct(product);
     setDetailQuantity(1);
+    setProductResenas([]);
+    fetchProductResenas(product.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -632,6 +764,47 @@ function App() {
                   </div>
                 </div>
 
+                {/* Reseñas Section */}
+                <section className="mt-12 pt-8 border-t border-slate-200">
+                  <h3 className="font-heading font-bold text-slate-900 text-lg mb-6">Calificaciones y Reseñas</h3>
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div>
+                      {productResenas.length > 0 ? (
+                        <div className="space-y-4">
+                          {productResenas.map(r => (
+                            <div key={r.id} className="bg-slate-50 p-4 rounded-xl">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-bold text-slate-800 text-sm">{r.autor}</span>
+                                <span className="text-amber-500 text-xs">{'★'.repeat(r.calificacion)}{'☆'.repeat(5-r.calificacion)}</span>
+                              </div>
+                              <p className="text-sm text-slate-600">{r.comentario}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500">Aún no hay reseñas para este producto. ¡Sé el primero en opinar!</p>
+                      )}
+                    </div>
+                    <div>
+                      <form onSubmit={handleResenaSubmit} className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                        <h4 className="font-bold text-sm mb-4">Escribe una reseña</h4>
+                        <div className="space-y-3">
+                          <input type="text" placeholder="Tu nombre" required value={resenaForm.autor} onChange={e => setResenaForm({...resenaForm, autor: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg" />
+                          <select value={resenaForm.calificacion} onChange={e => setResenaForm({...resenaForm, calificacion: parseInt(e.target.value)})} className="w-full px-3 py-2 text-sm border rounded-lg bg-white">
+                            <option value={5}>⭐⭐⭐⭐⭐ (Excelente)</option>
+                            <option value={4}>⭐⭐⭐⭐ (Muy bueno)</option>
+                            <option value={3}>⭐⭐⭐ (Bueno)</option>
+                            <option value={2}>⭐⭐ (Regular)</option>
+                            <option value={1}>⭐ (Malo)</option>
+                          </select>
+                          <textarea placeholder="Cuéntanos qué te pareció..." required rows={3} value={resenaForm.comentario} onChange={e => setResenaForm({...resenaForm, comentario: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg"></textarea>
+                          <button type="submit" className="w-full bg-slate-900 text-white font-bold py-2 rounded-lg text-sm">Enviar Reseña</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </section>
+
                 {/* Related Products */}
                 {getRelatedProducts(selectedProduct).length > 0 && (
                   <section className="mt-12 pt-8 border-t border-slate-200">
@@ -869,34 +1042,78 @@ function App() {
             </form>
           )}
         </main>
+      ) : !isAdminAuthenticated ? (
+        <main className="w-full px-4 py-20 flex-1 flex items-center justify-center bg-slate-50">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-slate-100">
+            <h2 className="text-2xl font-heading font-extrabold text-slate-900 mb-6 text-center">Admin Login</h2>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Usuario</label>
+                <input 
+                  type="text" 
+                  value={loginForm.username}
+                  onChange={e => setLoginForm({...loginForm, username: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-brand"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Contraseña</label>
+                <input 
+                  type="password" 
+                  value={loginForm.password}
+                  onChange={e => setLoginForm({...loginForm, password: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-brand"
+                />
+              </div>
+              <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg mt-2 transition">
+                Ingresar
+              </button>
+            </form>
+            <button onClick={() => setViewMode('shop')} className="w-full text-center text-xs text-slate-500 hover:text-slate-700 mt-6 font-semibold">
+              ← Volver a la Tienda
+            </button>
+          </div>
+        </main>
       ) : (
         // BACKEND / ADMIN VIEW
         <main className="w-full px-4 py-10 flex-1">
           <div className="flex items-center justify-between mb-8 border-b border-slate-200 pb-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-heading font-extrabold text-slate-900">Panel de Control</h1>
-              <p className="text-sm text-slate-500">Agrega, visualiza o elimina productos en la base de datos SQLite.</p>
+              <p className="text-sm text-slate-500">Administra inventario, pedidos, reclamos y reseñas.</p>
             </div>
             <button 
-              onClick={() => setViewMode('shop')}
+              onClick={() => { setViewMode('shop'); setIsAdminAuthenticated(false); }}
               className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-heading font-bold text-xs md:text-sm px-4 py-2.5 rounded-lg transition"
             >
-              ← Volver al Catálogo
+              Cerrar Sesión
             </button>
           </div>
 
-          <div className="flex gap-4 mb-6 border-b border-slate-200">
+          <div className="flex gap-4 mb-6 border-b border-slate-200 overflow-x-auto cat-nav-scroll">
             <button 
               onClick={() => setAdminTab('productos')}
-              className={`pb-3 font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'productos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'productos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
             >
-              Inventario de Productos
+              Inventario
+            </button>
+            <button 
+              onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
+              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'pedidos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+            >
+              Pedidos
             </button>
             <button 
               onClick={() => { setAdminTab('reclamos'); fetchReclamosList(); }}
-              className={`pb-3 font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'reclamos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'reclamos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
             >
-              Libro de Reclamaciones
+              Reclamos
+            </button>
+            <button 
+              onClick={() => { setAdminTab('resenas'); fetchAdminResenas(); }}
+              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'resenas' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+            >
+              Reseñas
             </button>
           </div>
 
@@ -1131,7 +1348,7 @@ function App() {
             </div>
           </div>
 
-          ) : (
+          ) : adminTab === 'reclamos' ? (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="font-heading font-bold text-slate-900">Listado de Reclamos y Quejas</h3>
@@ -1152,6 +1369,7 @@ function App() {
                       <th className="px-6 py-3">Contacto</th>
                       <th className="px-6 py-3">Tipo</th>
                       <th className="px-6 py-3">Motivo</th>
+                      <th className="px-6 py-3">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -1176,12 +1394,163 @@ function App() {
                         <td className="px-6 py-3.5 text-xs text-slate-600 max-w-xs">
                           <p className="line-clamp-2" title={rec.motivo}>{rec.motivo}</p>
                         </td>
+                        <td className="px-6 py-3.5">
+                          <select 
+                            value={rec.estado || 'Pendiente'}
+                            onChange={(e) => updateEstadoReclamo(rec.id, e.target.value)}
+                            className={`text-xs font-bold rounded px-2 py-1 border-none focus:ring-0 ${
+                              rec.estado === 'Resuelto' ? 'bg-emerald-100 text-emerald-700' :
+                              rec.estado === 'En Proceso' ? 'bg-sky-100 text-sky-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Resuelto">Resuelto</option>
+                          </select>
+                        </td>
                       </tr>
                     ))}
                     {reclamosList.length === 0 && (
                       <tr>
                         <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
                           No hay reclamos registrados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : adminTab === 'pedidos' ? (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-heading font-bold text-slate-900">Historial de Pedidos</h3>
+                <button 
+                  onClick={() => fetchPedidosList()}
+                  className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1"
+                >
+                  Actualizar
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
+                      <th className="px-6 py-3">Fecha</th>
+                      <th className="px-6 py-3">Cliente</th>
+                      <th className="px-6 py-3">Monto</th>
+                      <th className="px-6 py-3">Detalle</th>
+                      <th className="px-6 py-3">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {pedidosList.map((ped) => (
+                      <tr key={ped.id} className="hover:bg-slate-50/50 transition-colors align-top">
+                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                          {new Date(ped.fecha).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <p className="font-medium text-slate-800">{ped.nombre}</p>
+                          <p className="text-xs text-slate-500">📱 {ped.telefono}</p>
+                        </td>
+                        <td className="px-6 py-3.5 font-bold text-slate-900 text-xs">
+                          S/ {ped.total.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-3.5 text-xs text-slate-600">
+                          <ul className="list-disc pl-4">
+                            {ped.detalles && typeof ped.detalles === 'object' && ped.detalles.length > 0 ? (
+                              ped.detalles.map((d, i) => (
+                                <li key={i}>{d.quantity}x {d.nombre}</li>
+                              ))
+                            ) : (
+                              <li>Sin detalles</li>
+                            )}
+                          </ul>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <select 
+                            value={ped.estado || 'Pendiente'}
+                            onChange={(e) => updateEstadoPedido(ped.id, e.target.value)}
+                            className={`text-xs font-bold rounded px-2 py-1 border-none focus:ring-0 ${
+                              ped.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' :
+                              ped.estado === 'En Camino' ? 'bg-sky-100 text-sky-700' :
+                              ped.estado === 'Cancelado' ? 'bg-rose-100 text-rose-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En Camino">En Camino</option>
+                            <option value="Entregado">Entregado</option>
+                            <option value="Cancelado">Cancelado</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                    {pedidosList.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
+                          No hay pedidos registrados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-heading font-bold text-slate-900">Control de Reseñas</h3>
+                <button 
+                  onClick={() => fetchAdminResenas()}
+                  className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1"
+                >
+                  Actualizar
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
+                      <th className="px-6 py-3">Fecha</th>
+                      <th className="px-6 py-3">Autor</th>
+                      <th className="px-6 py-3">Calificación</th>
+                      <th className="px-6 py-3">Comentario</th>
+                      <th className="px-6 py-3">Visibilidad</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {resenasList.map((res) => (
+                      <tr key={res.id} className="hover:bg-slate-50/50 transition-colors align-top">
+                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                          {new Date(res.fecha).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <p className="font-medium text-slate-800">{res.autor}</p>
+                        </td>
+                        <td className="px-6 py-3.5 text-xs text-amber-500">
+                          {'★'.repeat(res.calificacion)}{'☆'.repeat(5 - res.calificacion)}
+                        </td>
+                        <td className="px-6 py-3.5 text-xs text-slate-600 max-w-xs">
+                          {res.comentario}
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <button 
+                            onClick={() => updateAprobacionResena(res.id, !res.aprobado)}
+                            className={`text-xs font-bold px-3 py-1 rounded-full ${res.aprobado ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}
+                          >
+                            {res.aprobado ? 'Aprobado (Público)' : 'Oculto'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {resenasList.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
+                          No hay reseñas registradas.
                         </td>
                       </tr>
                     )}
@@ -1508,17 +1877,18 @@ function App() {
                   </span>
                 </div>
                 
-                <a 
-                  href={getWhatsAppLink()}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-heading font-bold text-sm text-center shadow-lg shadow-brand/10 transition"
-                >
-                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z" />
-                  </svg>
-                  <span>Pedir por WhatsApp</span>
-                </a>
+                <form onSubmit={handleCheckout} className="space-y-3 mb-4 border-t border-slate-200 pt-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tus datos para el pedido</p>
+                  <input type="text" placeholder="Nombre completo" required value={checkoutForm.nombre} onChange={e => setCheckoutForm({...checkoutForm, nombre: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
+                  <input type="tel" placeholder="Teléfono / WhatsApp" required value={checkoutForm.telefono} onChange={e => setCheckoutForm({...checkoutForm, telefono: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
+                  
+                  <button type="submit" className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-heading font-bold text-sm shadow-lg shadow-brand/10 transition mt-2">
+                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z" />
+                    </svg>
+                    <span>Pedir por WhatsApp</span>
+                  </button>
+                </form>
                 
                 <p className="text-[10px] text-center text-slate-400 mt-3">
                   Te redirigiremos a WhatsApp para finalizar la entrega y el pago con un asesor de Yumar.

@@ -149,6 +149,10 @@ function App() {
 
   useEffect(() => {
     if (viewMode === 'admin' && isAdminAuthenticated) {
+      if (adminTab === 'productos') {
+        fetchProducts();
+        fetchAllProducts();
+      }
       if (adminTab === 'reclamos') fetchReclamosList();
       if (adminTab === 'pedidos') fetchPedidosList();
       if (adminTab === 'resenas') fetchAdminResenas();
@@ -251,6 +255,11 @@ function App() {
       
       setCart([]);
       setCartOpen(false);
+      
+      // Refresh inventory so stock updates locally
+      fetchProducts();
+      fetchAllProducts();
+      
       showToast("Pedido registrado correctamente.");
     } catch (err) {
       showToast("Error al procesar el pedido.");

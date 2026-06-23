@@ -432,7 +432,7 @@ app.post('/api/pedidos', async (req, res) => {
     if (detalles && Array.isArray(detalles)) {
       for (const item of detalles) {
         if (item.id && item.quantity) {
-          await pool.query("UPDATE productos SET stock = stock - $1 WHERE id = $2", [item.quantity, item.id]);
+          await pool.query("UPDATE productos SET stock = COALESCE(stock, 0) - $1 WHERE id = $2", [item.quantity, item.id]);
         }
       }
     }
@@ -467,7 +467,7 @@ app.patch('/api/pedidos/:id/estado', async (req, res) => {
         if (detalles && Array.isArray(detalles)) {
           for (const item of detalles) {
             if (item.id && item.quantity) {
-              await pool.query("UPDATE productos SET stock = stock - $1 WHERE id = $2", [item.quantity, item.id]);
+              await pool.query("UPDATE productos SET stock = COALESCE(stock, 0) - $1 WHERE id = $2", [item.quantity, item.id]);
             }
           }
         }
@@ -476,7 +476,7 @@ app.patch('/api/pedidos/:id/estado', async (req, res) => {
         if (detalles && Array.isArray(detalles)) {
           for (const item of detalles) {
             if (item.id && item.quantity) {
-              await pool.query("UPDATE productos SET stock = stock + $1 WHERE id = $2", [item.quantity, item.id]);
+              await pool.query("UPDATE productos SET stock = COALESCE(stock, 0) + $1 WHERE id = $2", [item.quantity, item.id]);
             }
           }
         }

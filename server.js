@@ -427,6 +427,16 @@ app.post('/api/pedidos', async (req, res) => {
       "INSERT INTO pedidos (nombre, telefono, correo, total, detalles) VALUES ($1, $2, $3, $4, $5) RETURNING *",
       [nombre, telefono, correo, total, JSON.stringify(detalles)]
     );
+
+    // Decrease stock
+    if (detalles && Array.isArray(detalles)) {
+      for (const item of detalles) {
+        if (item.id && item.quantity) {
+          await pool.query("UPDATE productos SET stock = stock - $1 WHERE id = $2", [item.quantity, item.id]);
+        }
+      }
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -443,6 +453,35 @@ app.patch('/api/pedidos/:id/estado', async (req, res) => {
     try {
       await pool.query("ALTER TABLE pedidos ADD COLUMN estado TEXT DEFAULT 'Pendiente'");
     } catch (e) { /* ignore if already exists */ }
+
+    // Check old state to manage stock
+    const oldPedidoResult = await pool.query("SELECT estado, detalles FROM pedidos WHERE id = $1", [id]);
+    if (oldPedidoResult.rows.length > 0) {
+      const oldState = oldPedidoResult.rows[0].estado || 'Pendiente';
+      const detalles = typeof oldPedidoResult.rows[0].detalles === 'string' 
+        ? JSON.parse(oldPedidoResult.rows[0].detalles) 
+        : oldPedidoResult.rows[0].detalles;
+      
+      if (oldState === 'Cancelado' && estado !== 'Cancelado') {
+        // Was cancelled, now active: decrease stock again
+        if (detalles && Array.isArray(detalles)) {
+          for (const item of detalles) {
+            if (item.id && item.quantity) {
+              await pool.query("UPDATE productos SET stock = stock - $1 WHERE id = $2", [item.quantity, item.id]);
+            }
+          }
+        }
+      } else if (oldState !== 'Cancelado' && estado === 'Cancelado') {
+        // Was active, now cancelled: return stock
+        if (detalles && Array.isArray(detalles)) {
+          for (const item of detalles) {
+            if (item.id && item.quantity) {
+              await pool.query("UPDATE productos SET stock = stock + $1 WHERE id = $2", [item.quantity, item.id]);
+            }
+          }
+        }
+      }
+    }
 
     const result = await pool.query("UPDATE pedidos SET estado = $1 WHERE id = $2 RETURNING *", [estado, id]);
     res.json(result.rows[0]);

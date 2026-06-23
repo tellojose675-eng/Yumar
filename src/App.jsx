@@ -471,6 +471,30 @@ function App() {
 
   const closeProduct = () => setSelectedProduct(null);
 
+  // Financial Metrics
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+  
+  const hace7Dias = new Date(hoy);
+  hace7Dias.setDate(hoy.getDate() - 7);
+  
+  const hace30Dias = new Date(hoy);
+  hace30Dias.setDate(hoy.getDate() - 30);
+
+  const pedidosValidos = pedidosList.filter(p => p.estado !== 'Cancelado');
+
+  const gananciasHoy = pedidosValidos
+    .filter(p => new Date(p.fecha) >= hoy)
+    .reduce((sum, p) => sum + p.total, 0);
+
+  const gananciasSemana = pedidosValidos
+    .filter(p => new Date(p.fecha) >= hace7Dias)
+    .reduce((sum, p) => sum + p.total, 0);
+
+  const gananciasMes = pedidosValidos
+    .filter(p => new Date(p.fecha) >= hace30Dias)
+    .reduce((sum, p) => sum + p.total, 0);
+
   return (
     <div className="min-h-screen flex flex-col font-sans bg-white w-full">
 
@@ -1469,6 +1493,28 @@ function App() {
                 >
                   Actualizar
                 </button>
+              </div>
+
+              {/* Pedidos Dashboard */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-6 bg-slate-50 border-b border-slate-100">
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Ganancias Hoy</span>
+                  <p className="text-xl md:text-2xl font-heading font-extrabold text-brand mt-1">
+                    S/ {gananciasHoy.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Últimos 7 Días</span>
+                  <p className="text-xl md:text-2xl font-heading font-extrabold text-emerald-600 mt-1">
+                    S/ {gananciasSemana.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Últimos 30 Días</span>
+                  <p className="text-xl md:text-2xl font-heading font-extrabold text-sky-600 mt-1">
+                    S/ {gananciasMes.toFixed(2)}
+                  </p>
+                </div>
               </div>
 
               <div className="overflow-x-auto">

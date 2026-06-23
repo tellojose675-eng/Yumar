@@ -37,6 +37,7 @@ function App() {
 
   // Admin Form State
   const [adminForm, setAdminForm] = useState({
+    id: null,
     nombre: '',
     precio: '',
     imagen: '',
@@ -262,7 +263,7 @@ function App() {
     setAdminForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCreateProduct = async (e) => {
+  const handleSaveProduct = async (e) => {
     e.preventDefault();
     if (!adminForm.nombre || !adminForm.precio) {
       showToast("Nombre y precio son campos obligatorios");
@@ -270,8 +271,12 @@ function App() {
     }
 
     try {
-      const res = await fetch('/api/productos', {
-        method: 'POST',
+      const isEditing = !!adminForm.id;
+      const url = isEditing ? `/api/productos/${adminForm.id}` : '/api/productos';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...adminForm,
@@ -282,13 +287,21 @@ function App() {
 
       if (!res.ok) throw new Error('Error al guardar producto');
       
-      const newProduct = await res.json();
-      setProducts(prev => [newProduct, ...prev]);
+      const savedProduct = await res.json();
+      
+      if (isEditing) {
+        setProducts(prev => prev.map(p => p.id === savedProduct.id ? savedProduct : p));
+        showToast(`Producto actualizado: ${savedProduct.nombre}`);
+      } else {
+        setProducts(prev => [savedProduct, ...prev]);
+        showToast(`Producto agregado: ${savedProduct.nombre}`);
+      }
+      
       fetchAllProducts();
-      showToast(`Producto agregado: ${newProduct.nombre}`);
       
       // Reset form
       setAdminForm({
+        id: null,
         nombre: '',
         precio: '',
         imagen: '',
@@ -299,8 +312,23 @@ function App() {
       });
     } catch (err) {
       console.error(err);
-      showToast("Error al guardar en base de datos");
+      showToast("Hubo un error al guardar. Por favor, intenta de nuevo.");
     }
+  };
+
+  const handleEditProduct = (product) => {
+    setAdminForm({
+      id: product.id,
+      nombre: product.nombre,
+      precio: product.precio,
+      imagen: product.imagen || '',
+      categoria: product.categoria || 'Tecnología',
+      descripcion: product.descripcion || '',
+      badge: product.badge || '',
+      stock: product.stock || 0
+    });
+    setAdminTab('productos');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteProduct = async (id, name) => {
@@ -1122,10 +1150,13 @@ function App() {
             
             {/* Left Col: Add Product Form */}
             <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
-              <h2 className="text-lg font-heading font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
-                Agregar Nuevo Producto
+              <h2 className="text-lg font-heading font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex justify-between items-center">
+                {adminForm.id ? "Editar Producto" : "Agregar Nuevo Producto"}
+                {adminForm.id && (
+                  <button type="button" onClick={() => setAdminForm({ id: null, nombre: '', precio: '', imagen: '', categoria: 'Tecnología', descripcion: '', badge: 'NUEVO INGRESO', stock: 0 })} className="text-xs text-slate-400 hover:text-brand underline">Cancelar</button>
+                )}
               </h2>
-              <form onSubmit={handleCreateProduct} className="space-y-4">
+              <form onSubmit={handleSaveProduct} className="space-y-4">
                 <div>
                   <label className="block text-xs font-heading font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                     Nombre del Producto *
@@ -1241,7 +1272,7 @@ function App() {
                   type="submit" 
                   className="w-full bg-brand hover:bg-brand-hover text-white font-heading font-bold text-sm py-2.5 rounded-lg transition shadow-md shadow-brand/10"
                 >
-                  Guardar Producto
+                  {adminForm.id ? "Actualizar Producto" : "Guardar Producto"}
                 </button>
               </form>
             </div>
@@ -1324,7 +1355,13 @@ function App() {
                               {prod.stock || 0}
                             </span>
                           </td>
-                          <td className="px-6 py-3.5 text-right">
+                          <td className="px-6 py-3.5 text-right space-x-3">
+                            <button
+                              onClick={() => handleEditProduct(prod)}
+                              className="text-brand hover:text-brand-hover font-heading font-bold text-xs hover:underline"
+                            >
+                              Editar
+                            </button>
                             <button
                               onClick={() => handleDeleteProduct(prod.id, prod.nombre)}
                               className="text-rose-500 hover:text-rose-700 font-heading font-bold text-xs hover:underline"

@@ -64,6 +64,38 @@ const initializeDatabase = async () => {
       )
     `);
 
+    // Add estado to reclamos if it doesn't exist (handle it safely)
+    try {
+      await pool.query(`ALTER TABLE reclamos ADD COLUMN estado TEXT DEFAULT 'Pendiente'`);
+    } catch (e) { /* ignore if already exists */ }
+
+    // Create pedidos table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pedidos (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        telefono TEXT,
+        correo TEXT,
+        total REAL NOT NULL,
+        detalles JSONB,
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        estado TEXT DEFAULT 'Pendiente'
+      )
+    `);
+
+    // Create resenas table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS resenas (
+        id SERIAL PRIMARY KEY,
+        producto_id INTEGER REFERENCES productos(id) ON DELETE CASCADE,
+        autor TEXT NOT NULL,
+        calificacion INTEGER NOT NULL,
+        comentario TEXT,
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        aprobado BOOLEAN DEFAULT true
+      )
+    `);
+
     // Check if table is empty and seed if needed
     const result = await pool.query('SELECT COUNT(*) as count FROM productos');
     if (result.rows[0].count === 0) {
@@ -270,6 +302,39 @@ app.post('/api/productos', async (req, res) => {
   }
 });
 
+// PUT /api/productos/:id - Update an existing product
+app.put('/api/productos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, precio, imagen, categoria, descripcion, badge, stock } = req.body;
+    
+    if (!nombre || precio === undefined) {
+      return res.status(400).json({ error: "Nombre and precio are required" });
+    }
+
+    const defaultImage = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&q=80";
+    const finalImage = imagen || defaultImage;
+    const finalCategory = categoria || "Tecnología";
+    const finalDesc = descripcion || "Producto importado de alta calidad.";
+    const finalBadge = badge || "";
+    const finalStock = stock !== undefined && stock !== '' ? parseInt(stock) : 0;
+
+    const result = await pool.query(
+      "UPDATE productos SET nombre = $1, precio = $2, imagen = $3, categoria = $4, descripcion = $5, badge = $6, stock = $7 WHERE id = $8 RETURNING *",
+      [nombre, precio, finalImage, finalCategory, finalDesc, finalBadge, finalStock, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating product:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/productos/:id - Delete a product
 app.delete('/api/productos/:id', async (req, res) => {
   try {
@@ -322,6 +387,113 @@ app.get('/api/reclamos', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching reclamos:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/reclamos/:id/estado
+app.patch('/api/reclamos/:id/estado', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+    
+    // Safety check to ensure column exists before update
+    try {
+      await pool.query("ALTER TABLE reclamos ADD COLUMN estado TEXT DEFAULT 'Pendiente'");
+    } catch (e) { /* ignore if already exists */ }
+
+    const result = await pool.query("UPDATE reclamos SET estado = $1 WHERE id = $2 RETURNING *", [estado, id]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/pedidos
+app.get('/api/pedidos', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM pedidos ORDER BY fecha DESC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/pedidos
+app.post('/api/pedidos', async (req, res) => {
+  try {
+    const { nombre, telefono, correo, total, detalles } = req.body;
+    const result = await pool.query(
+      "INSERT INTO pedidos (nombre, telefono, correo, total, detalles) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [nombre, telefono, correo, total, JSON.stringify(detalles)]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/pedidos/:id/estado
+app.patch('/api/pedidos/:id/estado', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    // Safety check to ensure column exists before update
+    try {
+      await pool.query("ALTER TABLE pedidos ADD COLUMN estado TEXT DEFAULT 'Pendiente'");
+    } catch (e) { /* ignore if already exists */ }
+
+    const result = await pool.query("UPDATE pedidos SET estado = $1 WHERE id = $2 RETURNING *", [estado, id]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/resenas/producto/:id
+app.get('/api/resenas/producto/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("SELECT * FROM resenas WHERE producto_id = $1 AND aprobado = true ORDER BY fecha DESC", [id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/resenas
+app.get('/api/resenas', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM resenas ORDER BY fecha DESC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/resenas
+app.post('/api/resenas', async (req, res) => {
+  try {
+    const { producto_id, autor, calificacion, comentario } = req.body;
+    const result = await pool.query(
+      "INSERT INTO resenas (producto_id, autor, calificacion, comentario) VALUES ($1, $2, $3, $4) RETURNING *",
+      [producto_id, autor, calificacion, comentario]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/resenas/:id/aprobado
+app.patch('/api/resenas/:id/aprobado', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { aprobado } = req.body;
+    const result = await pool.query("UPDATE resenas SET aprobado = $1 WHERE id = $2 RETURNING *", [aprobado, id]);
+    res.json(result.rows[0]);
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

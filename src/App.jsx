@@ -78,6 +78,42 @@ function App() {
   // Categories State
   const [categoriesList, setCategoriesList] = useState(['Todos', 'Tecnología', 'Hogar', 'Belleza']);
 
+  // Carousel State
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const heroBanners = [
+    {
+      id: 1,
+      image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80",
+      tagline: "Yumar Importaciones",
+      title: "Descubre\nNuevas Ofertas",
+      subtitle: "Encuentra tecnología, hogar y más con los mejores precios del mercado.",
+      buttonText: "Comprar Ahora"
+    },
+    {
+      id: 2,
+      image: "https://images.unsplash.com/photo-1555529771-835f59fc5efe?w=1200&q=80",
+      tagline: "Temporada de Descuentos",
+      title: "Lo Mejor\nPara tu Hogar",
+      subtitle: "Renueva tu espacio con nuestros increíbles productos para el hogar.",
+      buttonText: "Ver Catálogo"
+    },
+    {
+      id: 3,
+      image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1200&q=80",
+      tagline: "Tecnología y Gadgets",
+      title: "Accesorios\nPremium",
+      subtitle: "Lo último en gadgets y tecnología para tu día a día.",
+      buttonText: "Explorar Tecnología"
+    }
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % heroBanners.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [heroBanners.length]);
+
   // WhatsApp Config
   const WHATSAPP_NUMBER = "+51967227469"; // Customizable contact phone number for Yumar Importaciones
 
@@ -1035,13 +1071,36 @@ function App() {
               {/* Hero Banner / Carousel */}
               {!appliedSearch && currentCategory === 'Todos' && (
                 <div className="w-full px-4 pt-4 md:pt-6 relative max-w-[1400px] mx-auto">
-                  <div className="w-full h-[180px] md:h-[300px] lg:h-[400px] bg-slate-900 rounded-2xl overflow-hidden relative group">
-                    <img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80" alt="Ofertas Yumar" className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition duration-700" />
-                    <div className="absolute inset-0 flex flex-col justify-center px-8 md:px-16 text-white bg-gradient-to-r from-black/80 via-black/40 to-transparent">
-                      <span className="text-[10px] md:text-xs font-heading font-bold uppercase tracking-[0.2em] text-brand mb-2">Yumar Importaciones</span>
-                      <h2 className="text-2xl md:text-4xl lg:text-5xl font-heading font-extrabold mb-2 md:mb-4">Descubre<br />Nuevas Ofertas</h2>
-                      <p className="text-xs md:text-sm max-w-xs md:max-w-sm text-slate-200 mb-4 md:mb-6 hidden sm:block">Encuentra tecnología, hogar y más con los mejores precios del mercado.</p>
-                      <button onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })} className="bg-brand hover:bg-brand-hover text-white text-xs md:text-sm font-heading font-bold px-6 py-2.5 w-fit rounded-lg shadow-lg shadow-brand/30 transition">Comprar Ahora</button>
+                  <div className="w-full h-[180px] md:h-[300px] lg:h-[400px] rounded-2xl overflow-hidden relative group bg-slate-900">
+                    <div 
+                      className="w-full h-full flex transition-transform duration-700 ease-in-out" 
+                      style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                    >
+                      {heroBanners.map((banner) => (
+                        <div key={banner.id} className="min-w-full h-full relative flex-shrink-0">
+                          <img src={banner.image} alt={banner.title} className="w-full h-full object-cover opacity-60" />
+                          <div className="absolute inset-0 flex flex-col justify-center px-8 md:px-16 text-white bg-gradient-to-r from-black/80 via-black/40 to-transparent">
+                            <span className="text-[10px] md:text-xs font-heading font-bold uppercase tracking-[0.2em] text-brand mb-2">{banner.tagline}</span>
+                            <h2 className="text-2xl md:text-4xl lg:text-5xl font-heading font-extrabold mb-2 md:mb-4 whitespace-pre-line">{banner.title}</h2>
+                            <p className="text-xs md:text-sm max-w-xs md:max-w-sm text-slate-200 mb-4 md:mb-6 hidden sm:block">{banner.subtitle}</p>
+                            <button onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })} className="bg-brand hover:bg-brand-hover text-white text-xs md:text-sm font-heading font-bold px-6 py-2.5 w-fit rounded-lg shadow-lg shadow-brand/30 transition">
+                              {banner.buttonText}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Carousel Navigation Dots */}
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-20">
+                      {heroBanners.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentSlide(idx)}
+                          className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full transition-all duration-300 ${currentSlide === idx ? 'bg-brand scale-125' : 'bg-white/50 hover:bg-white/80'}`}
+                          aria-label={`Ir al slide ${idx + 1}`}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>

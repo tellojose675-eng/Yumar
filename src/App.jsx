@@ -71,6 +71,13 @@ function App() {
   // Toast Alert State
   const [toast, setToast] = useState({ show: false, message: '' });
 
+  // Admin Search State
+  const [adminProductSearch, setAdminProductSearch] = useState('');
+  const [adminOrderSearch, setAdminOrderSearch] = useState('');
+
+  // Categories State
+  const [categoriesList, setCategoriesList] = useState(['Todos', 'Tecnología', 'Hogar', 'Belleza']);
+
   // WhatsApp Config
   const WHATSAPP_NUMBER = "+51967227469"; // Customizable contact phone number for Yumar Importaciones
 
@@ -145,6 +152,26 @@ function App() {
       if (res.ok) setResenasList(await res.json());
     } catch { /* ignore */ }
   };
+
+  const fetchCategorias = async () => {
+    try {
+      const res = await fetch('/api/categorias');
+      if (res.ok) {
+        const data = await res.json();
+        const names = data.map(c => c.nombre);
+        if (names.length > 0) {
+          setCategoriesList(['Todos', ...names]);
+        }
+      }
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    fetchReclamosList();
+    fetchPedidosList();
+    fetchAdminResenas();
+    fetchCategorias();
+  }, []);
 
   const fetchProductResenas = async (id) => {
     try {
@@ -504,8 +531,20 @@ function App() {
   // Computed Values
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.precio * item.quantity, 0);
-  const categories = ['Todos', 'Tecnología', 'Hogar', 'Belleza', 'Deporte', 'Repostería', 'Ferretería', 'Productos para niños', 'Cocina'];
+  const categories = categoriesList;
   const navCategories = categories.filter(c => c !== 'Todos');
+
+  const filteredAdminProducts = products.filter(p => {
+    if (!adminProductSearch) return true;
+    const term = adminProductSearch.toLowerCase();
+    return p.nombre.toLowerCase().includes(term) || p.categoria.toLowerCase().includes(term);
+  });
+
+  const filteredPedidos = pedidosList.filter(p => {
+    if (!adminOrderSearch) return true;
+    const term = adminOrderSearch.toLowerCase();
+    return p.nombre.toLowerCase().includes(term) || (p.telefono && p.telefono.toLowerCase().includes(term)) || (p.estado && p.estado.toLowerCase().includes(term));
+  });
 
   const bestsellers = allProducts
     .filter(p => p.badge?.includes('VENDIDO') || p.badge?.includes('POPULAR'))
@@ -548,6 +587,45 @@ function App() {
   const gananciasMes = pedidosValidos
     .filter(p => new Date(p.fecha) >= hace30Dias)
     .reduce((sum, p) => sum + p.total, 0);
+
+  // Advanced Metrics
+  const lowStockProducts = allProducts.filter(p => (p.stock || 0) <= 5);
+
+  const getTopProducts = () => {
+    const counts = {};
+    pedidosValidos.forEach(ped => {
+      if (ped.detalles && typeof ped.detalles === 'object') {
+        ped.detalles.forEach(d => {
+          if (d.nombre) {
+            counts[d.nombre] = (counts[d.nombre] || 0) + (d.quantity || 1);
+          }
+        });
+      }
+    });
+    return Object.entries(counts)
+      .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 3);
+  };
+  const topProducts = getTopProducts();
+
+  const exportOrdersCSV = () => {
+    const header = "ID,Fecha,Cliente,Telefono,Metodo Entrega,Total,Estado\n";
+    const rows = pedidosList.map(p => {
+      const fecha = new Date(p.fecha).toLocaleDateString();
+      const entrega = p.metodo_entrega ? p.metodo_entrega.replace(/,/g, ' ') : 'Envío';
+      const nombre = p.nombre.replace(/,/g, ' ');
+      return `${p.id},${fecha},${nombre},${p.telefono},${entrega},${p.total},${p.estado || 'Pendiente'}`;
+    }).join("\n");
+    const csvContent = "data:text/csv;charset=utf-8," + header + rows;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `pedidos_yumar_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-white w-full">
@@ -954,6 +1032,20 @@ function App() {
           ) : (
             /* ===== CATALOG VIEW ===== */
             <>
+              {/* Hero Banner / Carousel */}
+              {!appliedSearch && currentCategory === 'Todos' && (
+                <div className="w-full px-4 pt-4 md:pt-6 relative max-w-[1400px] mx-auto">
+                  <div className="w-full h-[180px] md:h-[300px] lg:h-[400px] bg-slate-900 rounded-2xl overflow-hidden relative group">
+                    <img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80" alt="Ofertas Yumar" className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition duration-700" />
+                    <div className="absolute inset-0 flex flex-col justify-center px-8 md:px-16 text-white bg-gradient-to-r from-black/80 via-black/40 to-transparent">
+                      <span className="text-[10px] md:text-xs font-heading font-bold uppercase tracking-[0.2em] text-brand mb-2">Yumar Importaciones</span>
+                      <h2 className="text-2xl md:text-4xl lg:text-5xl font-heading font-extrabold mb-2 md:mb-4">Descubre<br />Nuevas Ofertas</h2>
+                      <p className="text-xs md:text-sm max-w-xs md:max-w-sm text-slate-200 mb-4 md:mb-6 hidden sm:block">Encuentra tecnología, hogar y más con los mejores precios del mercado.</p>
+                      <button onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })} className="bg-brand hover:bg-brand-hover text-white text-xs md:text-sm font-heading font-bold px-6 py-2.5 w-fit rounded-lg shadow-lg shadow-brand/30 transition">Comprar Ahora</button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Search results indicator */}
               {(appliedSearch || currentCategory !== 'Todos') && (
                 <div className="w-full px-4 pt-4 flex items-center justify-between text-xs text-slate-500">
@@ -1227,6 +1319,12 @@ function App() {
             >
               Reseñas
             </button>
+            <button 
+              onClick={() => { setAdminTab('categorias'); fetchCategorias(); }}
+              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'categorias' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+            >
+              Categorías
+            </button>
           </div>
 
           {adminTab === 'productos' ? (
@@ -1298,14 +1396,9 @@ function App() {
                     onChange={handleAdminFormChange}
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:border-brand"
                   >
-                    <option value="Tecnología">Tecnología</option>
-                    <option value="Hogar">Hogar</option>
-                    <option value="Belleza">Belleza</option>
-                    <option value="Deporte">Deporte</option>
-                    <option value="Repostería">Repostería</option>
-                    <option value="Ferretería">Ferretería</option>
-                    <option value="Productos para niños">Productos para niños</option>
-                    <option value="Cocina">Cocina</option>
+                    {categoriesList.filter(c => c !== 'Todos').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1386,14 +1479,23 @@ function App() {
 
               {/* Table Container */}
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <h3 className="font-heading font-bold text-slate-900">Listado de Inventario</h3>
-                  <button 
-                    onClick={() => fetchProducts()}
-                    className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1"
-                  >
-                    Actualizar
-                  </button>
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    <input
+                      type="text"
+                      placeholder="Buscar producto o categoría..."
+                      value={adminProductSearch}
+                      onChange={(e) => setAdminProductSearch(e.target.value)}
+                      className="flex-1 md:w-64 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-brand bg-slate-50"
+                    />
+                    <button 
+                      onClick={() => fetchProducts()}
+                      className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1 shrink-0"
+                    >
+                      Actualizar
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1409,7 +1511,7 @@ function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
-                      {products.map((prod) => (
+                      {filteredAdminProducts.map((prod) => (
                         <tr key={prod.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-3.5">
                             <img 
@@ -1455,10 +1557,10 @@ function App() {
                           </td>
                         </tr>
                       ))}
-                      {products.length === 0 && (
+                      {filteredAdminProducts.length === 0 && (
                         <tr>
                           <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
-                            No hay productos en inventario.
+                            No hay productos en inventario que coincidan con la búsqueda.
                           </td>
                         </tr>
                       )}
@@ -1543,37 +1645,113 @@ function App() {
                 </table>
               </div>
             </div>
+          ) : adminTab === 'categorias' ? (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm p-6">
+              <h3 className="font-heading font-bold text-slate-900 mb-6">Gestión de Categorías</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                  <h4 className="text-sm font-heading font-bold text-slate-700 mb-3">Añadir Nueva Categoría</h4>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const val = e.target.catName.value.trim();
+                    if (!val) return;
+                    try {
+                      await fetch('/api/categorias', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nombre: val })
+                      });
+                      fetchCategorias();
+                      e.target.reset();
+                      showToast('Categoría agregada');
+                    } catch (err) { showToast('Error al agregar'); }
+                  }} className="flex gap-2">
+                    <input name="catName" type="text" placeholder="Ej: Herramientas..." required className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-brand" />
+                    <button type="submit" className="bg-brand hover:bg-brand-hover text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md shadow-brand/20 transition">Añadir</button>
+                  </form>
+                </div>
+                <div>
+                  <h4 className="text-sm font-heading font-bold text-slate-700 mb-3">Lista de Categorías Activas</h4>
+                  <ul className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
+                    {categoriesList.filter(c => c !== 'Todos').map((cat, idx) => (
+                      <li key={idx} className="flex items-center justify-between px-5 py-3 text-sm hover:bg-slate-50 transition">
+                        <span className="font-medium text-slate-700">{cat}</span>
+                        <button onClick={async () => {
+                          if (!window.confirm(`¿Estás seguro de eliminar la categoría "${cat}"?`)) return;
+                          try {
+                            const res = await fetch('/api/categorias');
+                            const cats = await res.json();
+                            const target = cats.find(c => c.nombre === cat);
+                            if (target) {
+                              await fetch(`/api/categorias/${target.id}`, { method: 'DELETE' });
+                              fetchCategorias();
+                              showToast('Categoría eliminada');
+                            }
+                          } catch (err) { showToast('Error al eliminar'); }
+                        }} className="text-rose-500 font-bold text-xs hover:underline bg-rose-50 px-2.5 py-1 rounded">Eliminar</button>
+                      </li>
+                    ))}
+                    {categoriesList.filter(c => c !== 'Todos').length === 0 && (
+                      <li className="px-5 py-6 text-center text-slate-400 text-xs">No hay categorías configuradas.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
           ) : adminTab === 'pedidos' ? (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h3 className="font-heading font-bold text-slate-900">Historial de Pedidos</h3>
-                <button 
-                  onClick={() => fetchPedidosList()}
-                  className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1"
-                >
-                  Actualizar
-                </button>
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente, teléfono o estado..."
+                    value={adminOrderSearch}
+                    onChange={(e) => setAdminOrderSearch(e.target.value)}
+                    className="flex-1 md:w-64 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-brand bg-slate-50"
+                  />
+                  <button 
+                    onClick={exportOrdersCSV}
+                    className="text-xs font-heading font-bold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-100 flex items-center gap-1 transition"
+                  >
+                    ⬇️ Exportar CSV
+                  </button>
+                  <button 
+                    onClick={() => fetchPedidosList()}
+                    className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1 shrink-0"
+                  >
+                    Actualizar
+                  </button>
+                </div>
               </div>
 
               {/* Pedidos Dashboard */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-6 bg-slate-50 border-b border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-6 bg-slate-50 border-b border-slate-100">
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                   <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Ganancias Hoy</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-brand mt-1">
-                    S/ {gananciasHoy.toFixed(2)}
-                  </p>
+                  <p className="text-xl md:text-2xl font-heading font-extrabold text-brand mt-1">S/ {gananciasHoy.toFixed(2)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                   <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Últimos 7 Días</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-emerald-600 mt-1">
-                    S/ {gananciasSemana.toFixed(2)}
-                  </p>
+                  <p className="text-xl md:text-2xl font-heading font-extrabold text-emerald-600 mt-1">S/ {gananciasSemana.toFixed(2)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                   <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Últimos 30 Días</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-sky-600 mt-1">
-                    S/ {gananciasMes.toFixed(2)}
-                  </p>
+                  <p className="text-xl md:text-2xl font-heading font-extrabold text-sky-600 mt-1">S/ {gananciasMes.toFixed(2)}</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Top Ventas</span>
+                  <ul className="mt-1 space-y-1">
+                    {topProducts.length > 0 ? topProducts.map((tp, idx) => (
+                      <li key={idx} className="text-xs font-bold text-slate-700 truncate" title={tp.nombre}>{tp.cantidad}x {tp.nombre}</li>
+                    )) : <li className="text-xs text-slate-400">Sin datos</li>}
+                  </ul>
+                </div>
+                <div className="bg-white border border-rose-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-8 h-8 bg-rose-500 rounded-bl-full opacity-20"></div>
+                  <span className="text-[10px] font-heading font-bold text-rose-500 uppercase tracking-wider">Alerta Stock</span>
+                  <p className="text-xl md:text-2xl font-heading font-extrabold text-rose-600 mt-1">{lowStockProducts.length}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Productos por agotarse</p>
                 </div>
               </div>
 
@@ -1590,7 +1768,7 @@ function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
-                    {pedidosList.map((ped) => (
+                    {filteredPedidos.map((ped) => (
                       <tr key={ped.id} className="hover:bg-slate-50/50 transition-colors align-top">
                         <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
                           {new Date(ped.fecha).toLocaleDateString()}
@@ -1640,10 +1818,10 @@ function App() {
                         </td>
                       </tr>
                     ))}
-                    {pedidosList.length === 0 && (
+                    {filteredPedidos.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
-                          No hay pedidos registrados.
+                        <td colSpan={6} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
+                          No hay pedidos que coincidan con la búsqueda.
                         </td>
                       </tr>
                     )}

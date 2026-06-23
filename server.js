@@ -96,9 +96,27 @@ const initializeDatabase = async () => {
       )
     `);
 
+    // Create categorias table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS categorias (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL UNIQUE
+      )
+    `);
+
+    // Seed default categories if empty
+    const catResult = await pool.query('SELECT COUNT(*) as count FROM categorias');
+    if (catResult.rows[0].count === '0' || catResult.rows[0].count === 0) {
+      console.log('Seeding initial categories...');
+      const defaultCats = ['Tecnología', 'Hogar', 'Belleza', 'Moda', 'Accesorios', 'Juguetes', 'Deportes'];
+      for (const c of defaultCats) {
+        await pool.query('INSERT INTO categorias (nombre) VALUES ($1) ON CONFLICT DO NOTHING', [c]);
+      }
+    }
+
     // Check if table is empty and seed if needed
     const result = await pool.query('SELECT COUNT(*) as count FROM productos');
-    if (result.rows[0].count === 0) {
+    if (result.rows[0].count === '0' || result.rows[0].count === 0) {
       console.log('Database empty. Seeding initial products...');
       await seedProducts();
     }
@@ -537,6 +555,44 @@ app.patch('/api/resenas/:id/aprobado', async (req, res) => {
     const { aprobado } = req.body;
     const result = await pool.query("UPDATE resenas SET aprobado = $1 WHERE id = $2 RETURNING *", [aprobado, id]);
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CATEGORIAS ROUTES
+
+// GET /api/categorias
+app.get('/api/categorias', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM categorias ORDER BY nombre ASC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/categorias
+app.post('/api/categorias', async (req, res) => {
+  try {
+    const { nombre } = req.body;
+    if (!nombre) return res.status(400).json({ error: "Nombre es requerido" });
+    const result = await pool.query(
+      "INSERT INTO categorias (nombre) VALUES ($1) ON CONFLICT DO NOTHING RETURNING *",
+      [nombre]
+    );
+    res.json(result.rows[0] || { message: "Categoría ya existe" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/categorias/:id
+app.delete('/api/categorias/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM categorias WHERE id = $1", [id]);
+    res.json({ message: "Categoría eliminada" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -171,6 +171,13 @@ function App() {
   const addToCart = (product, quantity = 1) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
+      const currentQty = existingItem ? existingItem.quantity : 0;
+      
+      if (currentQty + quantity > (product.stock || 0)) {
+        showToast(`Stock insuficiente. Solo hay ${product.stock || 0} unidades.`);
+        return prevCart;
+      }
+
       if (existingItem) {
         showToast(`Cantidad actualizada de: ${product.nombre}`);
         return prevCart.map((item) =>
@@ -188,6 +195,12 @@ function App() {
         .map((item) => {
           if (item.id === id) {
             const newQty = item.quantity + change;
+            const productInfo = allProducts.find(p => p.id === id);
+            const maxStock = productInfo ? (productInfo.stock || 0) : item.stock || 0;
+            if (newQty > maxStock) {
+              showToast(`Solo quedan ${maxStock} unidades disponibles.`);
+              return item;
+            }
             return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
           return item;
@@ -260,6 +273,23 @@ function App() {
       fetchProducts();
       fetchAllProducts();
       
+      // Update local state instantly so UI is responsive
+      const updateStockLocally = (productList) => productList.map(p => {
+        const cartItem = cart.find(c => c.id === p.id);
+        if (cartItem) {
+          return { ...p, stock: Math.max(0, (p.stock || 0) - cartItem.quantity) };
+        }
+        return p;
+      });
+      setProducts(prev => updateStockLocally(prev));
+      setAllProducts(prev => updateStockLocally(prev));
+      if (selectedProduct) {
+        const cartItem = cart.find(c => c.id === selectedProduct.id);
+        if (cartItem) {
+          setSelectedProduct(prev => ({ ...prev, stock: Math.max(0, (prev.stock || 0) - cartItem.quantity) }));
+        }
+      }
+
       showToast("Pedido registrado correctamente.");
     } catch (err) {
       showToast("Error al procesar el pedido.");
@@ -753,7 +783,13 @@ function App() {
                           {detailQuantity}
                         </span>
                         <button
-                          onClick={() => setDetailQuantity(prev => prev + 1)}
+                          onClick={() => setDetailQuantity(prev => {
+                            if (prev >= (selectedProduct.stock || 0)) {
+                              showToast(`Solo quedan ${selectedProduct.stock || 0} unidades disponibles.`);
+                              return prev;
+                            }
+                            return prev + 1;
+                          })}
                           className="px-4 py-2.5 text-lg font-light text-slate-600 hover:bg-slate-50 transition"
                         >
                           +

@@ -422,10 +422,15 @@ app.get('/api/pedidos', async (req, res) => {
 // POST /api/pedidos
 app.post('/api/pedidos', async (req, res) => {
   try {
-    const { nombre, telefono, correo, total, detalles } = req.body;
+    const { nombre, telefono, correo, total, detalles, metodo_entrega } = req.body;
+    
+    try {
+      await pool.query("ALTER TABLE pedidos ADD COLUMN metodo_entrega TEXT");
+    } catch (e) { /* ignore if already exists */ }
+
     const result = await pool.query(
-      "INSERT INTO pedidos (nombre, telefono, correo, total, detalles) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [nombre, telefono, correo, total, JSON.stringify(detalles)]
+      "INSERT INTO pedidos (nombre, telefono, correo, total, detalles, metodo_entrega) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [nombre, telefono, correo, total, JSON.stringify(detalles), metodo_entrega || '']
     );
 
     // Decrease stock

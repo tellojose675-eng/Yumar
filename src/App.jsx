@@ -56,7 +56,13 @@ function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
 
   // Checkout State
-  const [checkoutForm, setCheckoutForm] = useState({ nombre: '', telefono: '', correo: '' });
+  const [checkoutForm, setCheckoutForm] = useState({ 
+    nombre: '', 
+    telefono: '', 
+    correo: '', 
+    tipoEntrega: 'Envío a domicilio', 
+    direccion: '' 
+  });
   
   // Reseñas State
   const [productResenas, setProductResenas] = useState([]);
@@ -232,6 +238,10 @@ function App() {
       showToast("Por favor ingresa tu nombre y teléfono.");
       return;
     }
+    if (checkoutForm.tipoEntrega === 'Envío a domicilio' && !checkoutForm.direccion) {
+      showToast("Por favor ingresa tu dirección de entrega.");
+      return;
+    }
     
     try {
       // Save order to DB
@@ -241,15 +251,20 @@ function App() {
         body: JSON.stringify({
           ...checkoutForm,
           total: cartTotal,
-          detalles: cart
+          detalles: cart,
+          metodo_entrega: `${checkoutForm.tipoEntrega} - ${checkoutForm.direccion || 'Sin especificar'}`
         })
       });
       
       // WhatsApp message
       let text = `*🛍️ NUEVO PEDIDO - YuMar Importaciones*\n\n`;
       text += `*Cliente:* ${checkoutForm.nombre}\n`;
-      text += `*Teléfono:* ${checkoutForm.telefono}\n\n`;
-      text += `Hola, quiero realizar un pedido de los siguientes productos:\n\n`;
+      text += `*Teléfono:* ${checkoutForm.telefono}\n`;
+      text += `*Entrega:* ${checkoutForm.tipoEntrega}\n`;
+      if (checkoutForm.direccion) {
+        text += `*Dirección/Sede:* ${checkoutForm.direccion}\n`;
+      }
+      text += `\nHola, quiero realizar un pedido de los siguientes productos:\n\n`;
       
       let subtotal = 0;
       cart.forEach((item, index) => {
@@ -1568,6 +1583,7 @@ function App() {
                     <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
                       <th className="px-6 py-3">Fecha</th>
                       <th className="px-6 py-3">Cliente</th>
+                      <th className="px-6 py-3">Entrega</th>
                       <th className="px-6 py-3">Monto</th>
                       <th className="px-6 py-3">Detalle</th>
                       <th className="px-6 py-3">Estado</th>
@@ -1582,6 +1598,14 @@ function App() {
                         <td className="px-6 py-3.5">
                           <p className="font-medium text-slate-800">{ped.nombre}</p>
                           <p className="text-xs text-slate-500">📱 {ped.telefono}</p>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <p className="text-[10px] uppercase font-bold text-slate-500">
+                            {ped.metodo_entrega ? ped.metodo_entrega.split('-')[0] : 'Envío'}
+                          </p>
+                          <p className="text-xs text-slate-700 max-w-[140px] truncate" title={ped.metodo_entrega}>
+                            {ped.metodo_entrega ? ped.metodo_entrega.split('-')[1] : 'Sin especificar'}
+                          </p>
                         </td>
                         <td className="px-6 py-3.5 font-bold text-slate-900 text-xs">
                           S/ {ped.total.toFixed(2)}
@@ -2010,6 +2034,31 @@ function App() {
                   <input type="text" placeholder="Nombre completo" required value={checkoutForm.nombre} onChange={e => setCheckoutForm({...checkoutForm, nombre: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
                   <input type="tel" placeholder="Teléfono / WhatsApp" required value={checkoutForm.telefono} onChange={e => setCheckoutForm({...checkoutForm, telefono: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
                   
+                  {/* Método de entrega */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Método de Entrega</p>
+                    <div className="flex flex-col gap-2 mb-2">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                        <input type="radio" name="tipoEntrega" checked={checkoutForm.tipoEntrega === 'Envío a domicilio'} onChange={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'Envío a domicilio', direccion: ''})} className="accent-brand scale-110" />
+                        Envío a domicilio
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                        <input type="radio" name="tipoEntrega" checked={checkoutForm.tipoEntrega === 'Recojo en tienda'} onChange={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'Recojo en tienda', direccion: 'Sede 1'})} className="accent-brand scale-110" />
+                        Recojo en tienda
+                      </label>
+                    </div>
+
+                    {checkoutForm.tipoEntrega === 'Envío a domicilio' ? (
+                      <input type="text" placeholder="Ingresa tu dirección completa" required value={checkoutForm.direccion} onChange={e => setCheckoutForm({...checkoutForm, direccion: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
+                    ) : (
+                      <select value={checkoutForm.direccion} onChange={e => setCheckoutForm({...checkoutForm, direccion: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand bg-white">
+                        <option value="Sede 1">Sede 1</option>
+                        <option value="Sede 2">Sede 2</option>
+                        <option value="Sede 3">Sede 3</option>
+                      </select>
+                    )}
+                  </div>
+
                   <button type="submit" className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-heading font-bold text-sm shadow-lg shadow-brand/10 transition mt-2">
                     <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                       <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z" />

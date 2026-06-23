@@ -1806,11 +1806,19 @@ function App() {
                     )) : <li className="text-xs text-slate-400">Sin datos</li>}
                   </ul>
                 </div>
-                <div className="bg-white border border-rose-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-8 h-8 bg-rose-500 rounded-bl-full opacity-20"></div>
-                  <span className="text-[10px] font-heading font-bold text-rose-500 uppercase tracking-wider">Alerta Stock</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-rose-600 mt-1">{lowStockProducts.length}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Productos por agotarse</p>
+                <div className="bg-white border border-rose-200 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col">
+                  <div className="absolute top-0 right-0 w-8 h-8 bg-rose-500 rounded-bl-full opacity-20 z-0"></div>
+                  <div className="flex items-center justify-between z-10 relative">
+                    <span className="text-[10px] font-heading font-bold text-rose-500 uppercase tracking-wider">Alerta Stock</span>
+                    <span className="text-sm font-heading font-extrabold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">{lowStockProducts.length}</span>
+                  </div>
+                  <ul className="mt-2 space-y-1 overflow-y-auto max-h-[80px] pr-1 scrollbar-thin scrollbar-thumb-rose-200 scrollbar-track-transparent z-10 relative">
+                    {lowStockProducts.length > 0 ? lowStockProducts.map((p, idx) => (
+                      <li key={idx} className="text-[10px] font-bold text-slate-700 truncate" title={`${p.nombre} - Stock: ${p.stock || 0}`}>
+                        <span className="text-rose-500 mr-1">•</span>{p.nombre} <span className="text-rose-500 opacity-70">({p.stock || 0})</span>
+                      </li>
+                    )) : <li className="text-[10px] text-slate-400">Todo en orden ✅</li>}
+                  </ul>
                 </div>
               </div>
 

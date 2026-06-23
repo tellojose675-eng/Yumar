@@ -1129,6 +1129,7 @@ function App() {
                 </div>
               </div>
             </div>
+          </div>
 
           ) : (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -1189,8 +1190,6 @@ function App() {
               </div>
             </div>
           )}
-
-          </div>
         </main>
       )}
 

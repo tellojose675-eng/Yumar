@@ -1070,8 +1070,8 @@ function App() {
             <>
               {/* Hero Banner / Carousel */}
               {!appliedSearch && currentCategory === 'Todos' && (
-                <div className="w-full px-4 pt-4 md:pt-6 relative max-w-[1400px] mx-auto">
-                  <div className="w-full h-[180px] md:h-[300px] lg:h-[400px] rounded-2xl overflow-hidden relative group bg-slate-900">
+                <div className="w-full relative group bg-slate-900 overflow-hidden">
+                  <div className="w-full h-[220px] md:h-[400px] lg:h-[500px]">
                     <div 
                       className="w-full h-full flex transition-transform duration-700 ease-in-out" 
                       style={{ transform: `translateX(-${currentSlide * 100}%)` }}
@@ -1079,11 +1079,11 @@ function App() {
                       {heroBanners.map((banner) => (
                         <div key={banner.id} className="min-w-full h-full relative flex-shrink-0">
                           <img src={banner.image} alt={banner.title} className="w-full h-full object-cover opacity-60" />
-                          <div className="absolute inset-0 flex flex-col justify-center px-8 md:px-16 text-white bg-gradient-to-r from-black/80 via-black/40 to-transparent">
-                            <span className="text-[10px] md:text-xs font-heading font-bold uppercase tracking-[0.2em] text-brand mb-2">{banner.tagline}</span>
-                            <h2 className="text-2xl md:text-4xl lg:text-5xl font-heading font-extrabold mb-2 md:mb-4 whitespace-pre-line">{banner.title}</h2>
-                            <p className="text-xs md:text-sm max-w-xs md:max-w-sm text-slate-200 mb-4 md:mb-6 hidden sm:block">{banner.subtitle}</p>
-                            <button onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })} className="bg-brand hover:bg-brand-hover text-white text-xs md:text-sm font-heading font-bold px-6 py-2.5 w-fit rounded-lg shadow-lg shadow-brand/30 transition">
+                          <div className="absolute inset-0 flex flex-col justify-center px-8 md:px-24 max-w-6xl mx-auto text-white bg-gradient-to-r from-black/80 via-black/40 to-transparent">
+                            <span className="text-[10px] md:text-sm font-heading font-bold uppercase tracking-[0.2em] text-brand mb-2">{banner.tagline}</span>
+                            <h2 className="text-3xl md:text-5xl lg:text-6xl font-heading font-extrabold mb-3 md:mb-5 whitespace-pre-line">{banner.title}</h2>
+                            <p className="text-xs md:text-base max-w-xs md:max-w-md text-slate-200 mb-5 md:mb-8 hidden sm:block">{banner.subtitle}</p>
+                            <button onClick={() => window.scrollTo({ top: 600, behavior: 'smooth' })} className="bg-brand hover:bg-brand-hover text-white text-xs md:text-sm font-heading font-bold px-8 py-3 w-fit rounded-lg shadow-lg shadow-brand/30 transition">
                               {banner.buttonText}
                             </button>
                           </div>
@@ -1091,13 +1091,33 @@ function App() {
                       ))}
                     </div>
                     
+                    {/* Manual Navigation Arrows */}
+                    <button 
+                      onClick={() => setCurrentSlide(prev => (prev === 0 ? heroBanners.length - 1 : prev - 1))}
+                      className="absolute left-2 md:left-6 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-2 md:p-3 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
+                      aria-label="Anterior banner"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => setCurrentSlide(prev => (prev + 1) % heroBanners.length)}
+                      className="absolute right-2 md:right-6 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-2 md:p-3 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
+                      aria-label="Siguiente banner"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </button>
+
                     {/* Carousel Navigation Dots */}
-                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-20">
+                    <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2.5 z-20">
                       {heroBanners.map((_, idx) => (
                         <button
                           key={idx}
                           onClick={() => setCurrentSlide(idx)}
-                          className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full transition-all duration-300 ${currentSlide === idx ? 'bg-brand scale-125' : 'bg-white/50 hover:bg-white/80'}`}
+                          className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full transition-all duration-300 ${currentSlide === idx ? 'bg-brand scale-150' : 'bg-white/50 hover:bg-white/80'}`}
                           aria-label={`Ir al slide ${idx + 1}`}
                         />
                       ))}

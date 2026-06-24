@@ -58,11 +58,18 @@ function App() {
   // Checkout State
   const [checkoutForm, setCheckoutForm] = useState({ 
     nombre: '', 
+    apellidos: '',
+    tipoDoc: 'DNI',
+    numDoc: '',
     telefono: '', 
     correo: '', 
-    tipoEntrega: 'Envío a domicilio', 
-    direccion: '' 
+    tipoEntrega: 'domicilio', // 'domicilio' or 'tienda'
+    departamento: 'Lima Metropolitana',
+    distrito: '',
+    direccion: '',
+    metodoPago: 'yape_plin'
   });
+  const [completedOrder, setCompletedOrder] = useState(null);
   
   // Reseñas State
   const [productResenas, setProductResenas] = useState([]);
@@ -116,6 +123,8 @@ function App() {
 
   // WhatsApp Config
   const WHATSAPP_NUMBER = "+51967227469"; // Customizable contact phone number for Yumar Importaciones
+  const YAPE_NUMBER = "967227469";
+  const YAPE_NAME = "Yuly Quiroz Romero";
 
   // Save cart to local storage
   useEffect(() => {
@@ -297,55 +306,52 @@ function App() {
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    if (!checkoutForm.nombre || !checkoutForm.telefono) {
-      showToast("Por favor ingresa tu nombre y teléfono.");
-      return;
-    }
-    if (checkoutForm.tipoEntrega === 'Envío a domicilio' && !checkoutForm.direccion) {
-      showToast("Por favor ingresa tu dirección de entrega.");
+    if (!checkoutForm.nombre || !checkoutForm.apellidos || !checkoutForm.telefono || (checkoutForm.tipoEntrega === 'domicilio' && (!checkoutForm.direccion || !checkoutForm.distrito))) {
+      showToast("Por favor ingresa todos los campos obligatorios.");
       return;
     }
     
     try {
+      const metodoEntregaStr = checkoutForm.tipoEntrega === 'domicilio' 
+        ? `Envío a domicilio - ${checkoutForm.direccion}, ${checkoutForm.distrito}, ${checkoutForm.departamento} (${checkoutForm.apellidos}, ${checkoutForm.tipoDoc}: ${checkoutForm.numDoc}, Pago: ${checkoutForm.metodoPago === 'yape_plin' ? 'Yape/Plin' : 'Transferencia'})`
+        : `Recojo en tienda - Sede: ${checkoutForm.direccion} (${checkoutForm.apellidos}, ${checkoutForm.tipoDoc}: ${checkoutForm.numDoc}, Pago: ${checkoutForm.metodoPago === 'yape_plin' ? 'Yape/Plin' : 'Transferencia'})`;
+
       // Save order to DB
-      await fetch('/api/pedidos', {
+      const response = await fetch('/api/pedidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...checkoutForm,
+          nombre: `${checkoutForm.nombre} ${checkoutForm.apellidos}`,
+          telefono: checkoutForm.telefono,
+          correo: checkoutForm.correo,
           total: cartTotal,
           detalles: cart,
-          metodo_entrega: `${checkoutForm.tipoEntrega} - ${checkoutForm.direccion || 'Sin especificar'}`
+          metodo_entrega: metodoEntregaStr,
+          metodo_pago: checkoutForm.metodoPago
         })
       });
       
-      // WhatsApp message
-      let text = `*🛍️ NUEVO PEDIDO - YuMar Importaciones*\n\n`;
-      text += `*Cliente:* ${checkoutForm.nombre}\n`;
-      text += `*Teléfono:* ${checkoutForm.telefono}\n`;
-      text += `*Entrega:* ${checkoutForm.tipoEntrega}\n`;
-      if (checkoutForm.direccion) {
-        text += `*Dirección/Sede:* ${checkoutForm.direccion}\n`;
-      }
-      text += `\nHola, quiero realizar un pedido de los siguientes productos:\n\n`;
+      const savedOrder = await response.json();
       
-      let subtotal = 0;
-      cart.forEach((item, index) => {
-        const itemTotal = item.precio * item.quantity;
-        subtotal += itemTotal;
-        text += `*${index + 1}. ${item.nombre}*\n`;
-        text += `   Cant: ${item.quantity} | P. Unit: S/ ${item.precio.toFixed(2)}\n`;
-        text += `   Subtotal: *S/ ${itemTotal.toFixed(2)}*\n\n`;
+      setCompletedOrder({
+        ...savedOrder,
+        clientName: `${checkoutForm.nombre} ${checkoutForm.apellidos}`,
+        docType: checkoutForm.tipoDoc,
+        docNum: checkoutForm.numDoc,
+        telefono: checkoutForm.telefono,
+        correo: checkoutForm.correo,
+        deliveryType: checkoutForm.tipoEntrega,
+        addressInfo: checkoutForm.tipoEntrega === 'domicilio' 
+          ? `${checkoutForm.direccion}, ${checkoutForm.distrito}, ${checkoutForm.departamento}`
+          : checkoutForm.direccion,
+        paymentMethod: checkoutForm.metodoPago === 'yape_plin' ? 'Yape / Plin' : 'Depósito o Transferencia Bancaria',
+        items: cart,
+        subtotal: cartTotal
       });
-      
-      text += `-----------------------------------\n`;
-      text += `*💰 TOTAL A PAGAR: S/ ${subtotal.toFixed(2)}*\n\n`;
-      text += `Por favor, confírmenme la disponibilidad y los métodos de pago. ¡Gracias!`;
-      
-      window.open(`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(text)}`, '_blank');
       
       setCart([]);
       setCartOpen(false);
+      setViewMode('voucher');
       
       // Refresh inventory so stock updates locally
       fetchProducts();
@@ -445,7 +451,48 @@ function App() {
       stock: product.stock || 0
     });
     setAdminTab('productos');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      document.getElementById('admin-form-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const MAX_SIZE = 800;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setAdminForm(prev => ({ ...prev, imagen: dataUrl }));
+        showToast('Imagen optimizada y cargada correctamente');
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteProduct = async (id, name) => {
@@ -552,6 +599,40 @@ function App() {
     } catch (err) { showToast("Error al actualizar estado"); }
   };
 
+  const deletePedido = async (id) => {
+    if (!confirm("¿Estás seguro de que deseas eliminar este pedido?")) return;
+    try {
+      const res = await fetch(`/api/pedidos/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        showToast("Pedido eliminado correctamente");
+        fetchPedidosList();
+      } else {
+        showToast("Error al eliminar pedido");
+      }
+    } catch (err) {
+      showToast("Error al eliminar pedido");
+    }
+  };
+
+  const clearPedidosHistory = async () => {
+    if (!confirm("⚠️ ¿Estás absolutamente seguro de que deseas vaciar TODO el historial de pedidos? Esta acción no se puede deshacer.")) return;
+    try {
+      const res = await fetch('/api/pedidos', {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        showToast("Historial de pedidos vaciado");
+        fetchPedidosList();
+      } else {
+        showToast("Error al vaciar historial");
+      }
+    } catch (err) {
+      showToast("Error al vaciar historial");
+    }
+  };
+
   const updateAprobacionResena = async (id, aprobado) => {
     try {
       await fetch(`/api/resenas/${id}/aprobado`, {
@@ -564,7 +645,44 @@ function App() {
     } catch (err) { showToast("Error al actualizar estado"); }
   };
 
+  const deleteReclamo = async (id) => {
+    if (!confirm("¿Eliminar este reclamo?")) return;
+    try {
+      const res = await fetch(`/api/reclamos/${id}`, { method: 'DELETE' });
+      if (res.ok) { showToast("Reclamo eliminado"); fetchReclamosList(); }
+      else showToast("Error al eliminar");
+    } catch { showToast("Error al eliminar"); }
+  };
+
+  const clearReclamosHistory = async () => {
+    if (!confirm("⚠️ ¿Vaciar TODOS los reclamos? Esta acción no se puede deshacer.")) return;
+    try {
+      const res = await fetch('/api/reclamos', { method: 'DELETE' });
+      if (res.ok) { showToast("Reclamos vaciados"); fetchReclamosList(); }
+      else showToast("Error al vaciar");
+    } catch { showToast("Error al vaciar"); }
+  };
+
+  const deleteResena = async (id) => {
+    if (!confirm("¿Eliminar esta reseña?")) return;
+    try {
+      const res = await fetch(`/api/resenas/${id}`, { method: 'DELETE' });
+      if (res.ok) { showToast("Reseña eliminada"); fetchAdminResenas(); }
+      else showToast("Error al eliminar");
+    } catch { showToast("Error al eliminar"); }
+  };
+
+  const clearResenasHistory = async () => {
+    if (!confirm("⚠️ ¿Vaciar TODAS las reseñas? Esta acción no se puede deshacer.")) return;
+    try {
+      const res = await fetch('/api/resenas', { method: 'DELETE' });
+      if (res.ok) { showToast("Reseñas vaciadas"); fetchAdminResenas(); }
+      else showToast("Error al vaciar");
+    } catch { showToast("Error al vaciar"); }
+  };
+
   // Computed Values
+
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.precio * item.quantity, 0);
   const categories = categoriesList;
@@ -667,7 +785,7 @@ function App() {
     <div className="min-h-screen flex flex-col font-sans bg-white w-full">
 
       {/* Sticky Header Block */}
-      <div className="sticky-header">
+      <div className="sticky-header print:hidden">
       {/* Top WhatsApp Bar - estilo Grupo Kafi */}
       <div className="bg-brand text-white text-center text-xs md:text-sm py-2 font-medium tracking-wide">
         <a
@@ -736,18 +854,7 @@ function App() {
                 </svg>
               </button>
 
-              {/* MI CUENTA / Admin */}
-              <button
-                onClick={() => setViewMode(prev => prev === 'shop' ? 'admin' : 'shop')}
-                className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition group"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6" style={{ color: '#0ea5e9' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                </svg>
-                <span className="text-xs font-heading font-bold uppercase tracking-wide" style={{ color: '#0ea5e9' }}>
-                  {viewMode === 'admin' ? 'Tienda' : 'Mi Cuenta'}
-                </span>
-              </button>
+              {/* Admin link hidden — accessible via gear icon in footer */}
 
               {/* Cart */}
               <button
@@ -930,7 +1037,7 @@ function App() {
                     <button
                       onClick={() => {
                         addToCart(selectedProduct, detailQuantity);
-                        setCartOpen(true);
+                        setViewMode('checkout');
                         showToast("Por favor, completa tus datos para finalizar la compra.");
                       }}
                       className="mt-4 w-full bg-brand hover:bg-brand-hover text-white font-heading font-bold text-sm py-3.5 rounded transition uppercase tracking-wide"
@@ -975,10 +1082,10 @@ function App() {
                                 className="w-14 h-14 object-cover rounded border border-slate-100 flex-shrink-0"
                               />
                               <div className="min-w-0">
-                                <p className="text-[11px] font-heading font-semibold text-slate-700 uppercase line-clamp-2 group-hover:text-brand transition">
+                                <p className="text-sm font-heading font-bold text-slate-800 uppercase line-clamp-2 leading-snug group-hover:text-brand transition pr-2">
                                   {item.nombre}
                                 </p>
-                                <p className="text-sm font-heading font-bold text-slate-900 mt-0.5">
+                                <p className="text-sm font-heading font-extrabold text-slate-900 mt-1">
                                   S/ {item.precio.toFixed(2)}
                                 </p>
                               </div>
@@ -1052,10 +1159,10 @@ function App() {
                             )}
                             <img src={prod.imagen} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           </div>
-                          <p className="text-[10px] font-heading font-semibold text-slate-700 uppercase line-clamp-2 leading-tight group-hover:text-brand transition">
+                          <p className="text-sm font-heading font-bold text-slate-800 uppercase line-clamp-2 leading-snug group-hover:text-brand transition px-1.5 mt-1">
                             {prod.nombre}
                           </p>
-                          <p className="text-sm font-heading font-bold text-slate-900 mt-1">
+                          <p className="text-sm font-heading font-extrabold text-slate-900 mt-1.5 px-1.5 mb-1.5">
                             S/ {prod.precio.toFixed(2)}
                           </p>
                         </button>
@@ -1200,15 +1307,15 @@ function App() {
                           />
                         </div>
 
-                        <div className="pt-2.5 px-0.5">
+                        <div className="pt-3 px-2.5 pb-2.5 flex flex-col justify-between flex-1">
                           <h3
-                            className="font-heading font-semibold text-slate-800 text-[11px] md:text-xs uppercase line-clamp-2 leading-tight cursor-pointer group-hover:text-brand transition-colors min-h-[2.5em]"
+                            className="font-heading font-bold text-slate-800 text-sm md:text-base uppercase line-clamp-2 leading-snug cursor-pointer group-hover:text-brand transition-colors text-left"
                             onClick={() => openProduct(product)}
                           >
                             {product.nombre}
                           </h3>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="font-heading font-bold text-sm md:text-base text-slate-900">
+                          <div className="flex items-center justify-between mt-3">
+                            <span className="font-heading font-extrabold text-sm md:text-base text-slate-900">
                               S/ {product.precio.toFixed(2)}
                             </span>
                             <button
@@ -1231,6 +1338,486 @@ function App() {
             </>
           )}
 
+        </main>
+      ) : viewMode === 'checkout' ? (
+        /* ===== CHECKOUT PAGE ===== */
+        <main className="w-full max-w-7xl mx-auto px-4 py-8 flex-grow animate-fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-xl md:text-2xl font-heading font-extrabold text-slate-900 uppercase tracking-wide">Finalizar compra</h1>
+            <button 
+              type="button"
+              onClick={() => setViewMode('shop')}
+              className="text-brand text-xs md:text-sm font-heading font-semibold hover:underline flex items-center gap-1"
+            >
+              ← Seguir comprando
+            </button>
+          </div>
+
+          {/* Coupon Banner Notice */}
+          <div className="bg-[#fcfafb] border border-dashed border-[#e6b1c4] rounded-lg p-4 mb-8 text-sm text-slate-600">
+            ¿Tienes un cupón? <span className="text-brand font-semibold cursor-pointer hover:underline">Haz clic aquí para introducir tu código</span>
+          </div>
+
+          <form onSubmit={handleCheckout} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Detalles de Facturación */}
+            <div className="lg:col-span-7 space-y-6">
+              <h2 className="text-base font-heading font-extrabold text-slate-900 uppercase tracking-wider pb-3 border-b border-slate-100">
+                Detalles de facturación
+              </h2>
+
+              {/* Delivery Option Selector */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-700 uppercase">Método de entrega <span className="text-red-500">*</span></label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'domicilio', direccion: '', departamento: 'Lima Metropolitana', distrito: ''})}
+                    className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition text-left ${checkoutForm.tipoEntrega === 'domicilio' ? 'border-brand bg-brand/5 text-brand font-bold' : 'border-slate-200 hover:border-slate-350 text-slate-650 bg-white'}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.129-1.125v-3.02M18 18.75V15m-10.5-6h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6h3.15a1.5 1.5 0 0 1 1.06.44l1.89 1.89a1.5 1.5 0 0 1 .44 1.06v5.1a1.5 1.5 0 0 1-1.5 1.5h-9a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 12 7.5Z" />
+                    </svg>
+                    <div>
+                      <span className="text-xs uppercase block">Envío a domicilio</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Recibe en tu dirección</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'tienda', direccion: 'Santa Ana'})}
+                    className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition text-left ${checkoutForm.tipoEntrega === 'tienda' ? 'border-brand bg-brand/5 text-brand font-bold' : 'border-slate-200 hover:border-slate-350 text-slate-650 bg-white'}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19a1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
+                    </svg>
+                    <div>
+                      <span className="text-xs uppercase block">Recojo en tienda</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Recoge gratis en tienda</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Nombre <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={checkoutForm.nombre} 
+                    onChange={e => setCheckoutForm({...checkoutForm, nombre: e.target.value})}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Apellidos <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={checkoutForm.apellidos} 
+                    onChange={e => setCheckoutForm({...checkoutForm, apellidos: e.target.value})}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Documento <span className="text-red-500">*</span></label>
+                  <select 
+                    value={checkoutForm.tipoDoc} 
+                    onChange={e => setCheckoutForm({...checkoutForm, tipoDoc: e.target.value})}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white font-semibold"
+                  >
+                    <option value="DNI">DNI</option>
+                    <option value="CE">Carnet de Extranjería</option>
+                    <option value="RUC">RUC</option>
+                    <option value="Pasaporte">Pasaporte</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">N° de documento <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="Número de documento"
+                    value={checkoutForm.numDoc} 
+                    onChange={e => setCheckoutForm({...checkoutForm, numDoc: e.target.value})}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Teléfono <span className="text-red-500">*</span></label>
+                  <input 
+                    type="tel" 
+                    required 
+                    value={checkoutForm.telefono} 
+                    onChange={e => setCheckoutForm({...checkoutForm, telefono: e.target.value})}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Correo electrónico <span className="text-slate-400 text-[10px] lowercase normal-case ml-1 tracking-normal font-normal">(Opcional)</span></label>
+                  <input 
+                    type="email" 
+                    value={checkoutForm.correo} 
+                    onChange={e => setCheckoutForm({...checkoutForm, correo: e.target.value})}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
+                  />
+                </div>
+              </div>
+
+              {checkoutForm.tipoEntrega === 'domicilio' ? (
+                <div className="space-y-4 pt-4 border-t border-slate-100 animate-fade-in">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dirección de envío</h3>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Departamento <span className="text-red-500">*</span></label>
+                    <select 
+                      value={checkoutForm.departamento} 
+                      onChange={e => setCheckoutForm({...checkoutForm, departamento: e.target.value})}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white font-semibold"
+                    >
+                      <option value="Lima Metropolitana">Lima Metropolitana</option>
+                      <option value="Callao">Callao</option>
+                      <option value="Ancash">Ancash</option>
+                      <option value="Arequipa">Arequipa</option>
+                      <option value="Cusco">Cusco</option>
+                      <option value="La Libertad">La Libertad</option>
+                      <option value="Lambayeque">Lambayeque</option>
+                      <option value="Piura">Piura</option>
+                      <option value="Ica">Ica</option>
+                      <option value="Tacna">Tacna</option>
+                      <option value="Otros Departamentos">Otros Departamentos</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Distrito / Ciudad <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={checkoutForm.distrito} 
+                      onChange={e => setCheckoutForm({...checkoutForm, distrito: e.target.value})}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Dirección completa <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="Calle, avenida, condominio, lote, etc."
+                      value={checkoutForm.direccion} 
+                      onChange={e => setCheckoutForm({...checkoutForm, direccion: e.target.value})}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 pt-4 border-t border-slate-100 animate-fade-in">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tienda de recojo</h3>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Seleccionar Sede <span className="text-red-500">*</span></label>
+                    <select 
+                      value={checkoutForm.direccion} 
+                      onChange={e => setCheckoutForm({...checkoutForm, direccion: e.target.value})}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white font-semibold"
+                    >
+                      <option value="Santa Ana">Santa Ana</option>
+                      <option value="Villasol Huaca">Villasol Huaca</option>
+                      <option value="Villa Av. Central">Villa Av. Central</option>
+                      <option value="Puente Piedra">Puente Piedra</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Tu Pedido */}
+            <div className="lg:col-span-5 bg-[#fbfbfb] border border-slate-200 rounded-lg p-6 space-y-6">
+              <h2 className="text-base font-heading font-extrabold text-slate-900 uppercase tracking-wider pb-3 border-b border-slate-200">
+                Tu pedido
+              </h2>
+
+              {cart.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-sm text-slate-500 font-semibold">Tu carrito está vacío.</p>
+                  <button 
+                    type="button"
+                    onClick={() => setViewMode('shop')}
+                    className="mt-4 bg-brand hover:bg-brand-hover text-white text-xs font-heading font-bold px-4 py-2 rounded-lg transition"
+                  >
+                    Volver a la tienda
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Table headers */}
+                  <div className="flex justify-between text-xs font-bold text-slate-700 uppercase tracking-wider pb-2 border-b border-slate-200">
+                    <span>Producto</span>
+                    <span>Subtotal</span>
+                  </div>
+
+                  {/* Product items list */}
+                  <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto pr-1">
+                    {cart.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between py-3 gap-3">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={item.imagen} 
+                            alt="" 
+                            className="w-12 h-12 object-cover rounded border border-slate-200 bg-white flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-800 line-clamp-2">
+                              {item.nombre} <span className="text-slate-400 font-bold ml-1">× {item.quantity}</span>
+                            </p>
+                            <button 
+                              type="button"
+                              onClick={() => removeFromCart(item.id, item.nombre)}
+                              className="text-[10px] text-red-500 hover:underline mt-1 flex items-center gap-0.5"
+                            >
+                              ✕ Eliminar
+                            </button>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-slate-950 flex-shrink-0">
+                          S/ {(item.precio * item.quantity).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Subtotal & Total */}
+                  <div className="space-y-3 pt-3 border-t border-slate-200">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-semibold text-slate-500">Subtotal</span>
+                      <span className="font-bold text-slate-900">S/ {cartTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-base pt-3 border-t border-slate-200">
+                      <span className="font-bold text-slate-900">Total</span>
+                      <span className="font-extrabold text-brand text-lg">S/ {cartTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Payment Options */}
+                  <div className="space-y-3 pt-4 border-t border-slate-200">
+                    <div className="space-y-2.5">
+                      {/* Option 1: Bancaria */}
+                      <label className="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 hover:border-slate-350 cursor-pointer transition bg-white">
+                        <input 
+                          type="radio" 
+                          name="metodoPago" 
+                          value="transferencia" 
+                          checked={checkoutForm.metodoPago === 'transferencia'}
+                          onChange={() => setCheckoutForm({...checkoutForm, metodoPago: 'transferencia'})}
+                          className="accent-brand mt-1" 
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold text-slate-800 block">Depósito o transferencia bancaria</span>
+                          {checkoutForm.metodoPago === 'transferencia' && (
+                            <span className="block mt-2 text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 animate-fade-in">
+                              Realiza tu depósito a nombre de: <strong>{YAPE_NAME}</strong>.<br />
+                              • <strong>BCP:</strong> 19312966274044<br />
+                              Envía la constancia de pago al WhatsApp para procesar tu pedido.
+                            </span>
+                          )}
+                        </div>
+                      </label>
+
+                      {/* Option 2: Yape/Plin */}
+                      <label className="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 hover:border-slate-350 cursor-pointer transition bg-white">
+                        <input 
+                          type="radio" 
+                          name="metodoPago" 
+                          value="yape_plin" 
+                          checked={checkoutForm.metodoPago === 'yape_plin'}
+                          onChange={() => setCheckoutForm({...checkoutForm, metodoPago: 'yape_plin'})}
+                          className="accent-brand mt-1" 
+                        />
+                        <div className="text-xs flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-slate-800">Pago con Yape</span>
+                            <div className="flex gap-1">
+                              <span className="bg-[#743484] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded leading-none">yape</span>
+                            </div>
+                          </div>
+                          
+                          {checkoutForm.metodoPago === 'yape_plin' && (
+                            <div className="mt-2 text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 animate-fade-in">
+                              Puedes realizar tu pago 100% seguro a través de tu aplicativo Yape registrando el número <strong className="text-slate-800">{YAPE_NUMBER}</strong>.<br />
+                              A nombre de: <strong>{YAPE_NAME}</strong>.<br />
+                              No olvides confirmar el pago enviando la constancia al <strong className="text-slate-800">{YAPE_NUMBER}</strong>.
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Submission Button */}
+                  <button 
+                    type="submit" 
+                    className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white py-3.5 rounded-xl font-heading font-extrabold text-sm shadow-lg shadow-brand/10 transition mt-6"
+                  >
+                    <span>Realizar el pedido</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                    </svg>
+                  </button>
+
+                  <p className="text-[10px] text-center text-slate-400 leading-relaxed mt-4">
+                    Tus datos personales se utilizarán para procesar tu pedido. Serás redirigido a WhatsApp para finalizar la entrega y el pago con un asesor.
+                  </p>
+                </div>
+              )}
+            </div>
+          </form>
+        </main>
+      ) : viewMode === 'voucher' && completedOrder ? (
+        /* ===== VOUCHER PAGE ===== */
+        <main className="w-full max-w-2xl mx-auto px-4 py-12 flex-grow animate-fade-in print:py-0 print:px-0">
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 md:p-10 shadow-sm relative overflow-hidden print:border-none print:shadow-none print:p-0">
+            {/* Voucher Header */}
+            <div className="flex flex-col items-center justify-center text-center mb-8 border-b border-slate-100 pb-8">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-8 h-8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-heading font-extrabold text-slate-900 uppercase">¡Pedido Confirmado!</h1>
+              <p className="text-slate-500 mt-2 text-sm">Tu número de orden es <span className="font-bold text-slate-800">#{completedOrder.id || Math.floor(Math.random() * 10000)}</span></p>
+              
+              <div className="mt-4 inline-block bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 text-left">
+                <p className="text-xs text-slate-500 font-medium mb-1">YuMar Importaciones - RUC: <span className="font-bold text-slate-700">20614188465</span></p>
+                <p className="text-xs text-slate-500 font-medium">Fecha y hora: <span className="font-bold text-slate-700">{completedOrder.fecha ? new Date(completedOrder.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit' }) : new Date().toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit' })}</span></p>
+              </div>
+            </div>
+
+            {/* Voucher Body */}
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-slate-400 font-bold uppercase mb-1">Cliente</p>
+                  <p className="font-semibold text-slate-800">{completedOrder.clientName}</p>
+                  <p className="text-slate-600">{completedOrder.docType}: {completedOrder.docNum}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 font-bold uppercase mb-1">Contacto</p>
+                  <p className="text-slate-600">{completedOrder.telefono}</p>
+                  <p className="text-slate-600">{completedOrder.correo || 'Sin correo'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm pt-4 border-t border-slate-100">
+                <div>
+                  <p className="text-xs text-slate-400 font-bold uppercase mb-1">Entrega</p>
+                  <p className="font-semibold text-slate-800">{completedOrder.deliveryType === 'domicilio' ? 'Envío a domicilio' : 'Recojo en tienda'}</p>
+                  <p className="text-slate-600">{completedOrder.addressInfo}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 font-bold uppercase mb-1">Método de Pago</p>
+                  <p className="font-semibold text-slate-800">{completedOrder.paymentMethod}</p>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="pt-4 border-t border-slate-100">
+                <p className="text-xs text-slate-400 font-bold uppercase mb-3">Resumen de Productos</p>
+                <div className="space-y-3">
+                  {completedOrder.items && completedOrder.items.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-slate-600">{item.quantity}x {item.nombre}</span>
+                      <span className="font-semibold text-slate-800">S/ {(item.precio * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total */}
+              <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                <span className="font-heading font-extrabold text-slate-900 uppercase">Total a Pagar</span>
+                <span className="text-xl font-heading font-extrabold text-brand">S/ {completedOrder.subtotal?.toFixed(2)}</span>
+              </div>
+              
+              {/* Payment Instructions */}
+              <div className="pt-4 border-t border-slate-100 bg-slate-50 p-4 rounded-lg text-sm text-slate-600 text-center">
+                <p className="font-semibold mb-1">¡Siguiente paso!</p>
+                <p>Envía este comprobante por WhatsApp a nuestro asesor para confirmar tu método de pago y programar el despacho.</p>
+              </div>
+            </div>
+
+            {/* Voucher Actions */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 print:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  let text = `*🛍️ PEDIDO CONFIRMADO #${completedOrder.id || ''} - YuMar Importaciones*\n\n`;
+                  text += `*Cliente:* ${completedOrder.clientName}\n`;
+                  text += `*Doc:* ${completedOrder.docType} ${completedOrder.docNum}\n`;
+                  text += `*Teléfono:* ${completedOrder.telefono}\n`;
+                  if (completedOrder.correo) text += `*Correo:* ${completedOrder.correo}\n`;
+                  
+                  if (completedOrder.deliveryType === 'domicilio') {
+                    text += `*Entrega:* Envío a domicilio\n`;
+                    text += `*Destino:* ${completedOrder.addressInfo}\n`;
+                  } else {
+                    text += `*Entrega:* Recojo en tienda\n`;
+                    text += `*Sede:* ${completedOrder.addressInfo}\n`;
+                  }
+                  text += `*Método de Pago:* ${completedOrder.paymentMethod}\n\n`;
+                  text += `*Productos:*\n`;
+                  
+                  completedOrder.items?.forEach((item, index) => {
+                    const itemTotal = item.precio * item.quantity;
+                    text += `*${index + 1}. ${item.nombre}*\n`;
+                    text += `   Cant: ${item.quantity} | P. Unit: S/ ${item.precio.toFixed(2)}\n`;
+                    text += `   Subtotal: *S/ ${itemTotal.toFixed(2)}*\n\n`;
+                  });
+                  
+                  text += `-----------------------------------\n`;
+                  text += `*💰 TOTAL A PAGAR: S/ ${completedOrder.subtotal?.toFixed(2)}*\n\n`;
+                  text += `Adjunto mi voucher. ¡Gracias!`;
+                  
+                  window.open(`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-heading font-bold text-sm flex items-center justify-center gap-2 transition shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path fillRule="evenodd" d="M1.5 4.5a3 3 0 0 1 3-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 0 1-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 0 0 6.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 0 1 1.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 0 1-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5Z" clipRule="evenodd" />
+                </svg>
+                Confirmar por WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-heading font-bold text-sm flex items-center justify-center gap-2 transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.728 6.75A.75.75 0 0 1 7.266 7h9.468a.75.75 0 0 1 .538.22l2.39 2.39A.75.75 0 0 1 19.882 10H4.118a.75.75 0 0 1-.53-.22l2.39-2.39A.75.75 0 0 1 6.728 6.75Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10.5v6a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 16.5v-6M9.75 13.5v-3m0 0v-3m0 3h4.5m-4.5 0v3m0-3H5.25" />
+                </svg>
+                Descargar Voucher
+              </button>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => { setCompletedOrder(null); setViewMode('shop'); }}
+              className="mt-4 w-full text-brand text-sm font-semibold hover:underline text-center print:hidden"
+            >
+              Volver a la tienda
+            </button>
+            
+            {/* Cutout details for visual style */}
+            <div className="absolute top-1/2 -left-3 w-6 h-6 bg-[#fcfafb] rounded-full border-r border-slate-200 hidden md:block print:hidden"></div>
+            <div className="absolute top-1/2 -right-3 w-6 h-6 bg-[#fcfafb] rounded-full border-l border-slate-200 hidden md:block print:hidden"></div>
+          </div>
         </main>
       ) : viewMode === 'reclamaciones' ? (
         /* ===== LIBRO DE RECLAMACIONES ===== */
@@ -1410,7 +1997,7 @@ function App() {
             <div className="grid lg:grid-cols-3 gap-8">
             
             {/* Left Col: Add Product Form */}
-            <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
+            <div id="admin-form-container" className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
               <h2 className="text-lg font-heading font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex justify-between items-center">
                 {adminForm.id ? "Editar Producto" : "Agregar Nuevo Producto"}
                 {adminForm.id && (
@@ -1491,9 +2078,18 @@ function App() {
                     value={adminForm.imagen}
                     onChange={handleAdminFormChange}
                     placeholder="https://images.unsplash.com/photo-..." 
-                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand mb-3"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Deja vacío para usar una imagen por defecto.</p>
+                  <div className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                    <span className="text-[10px] font-heading font-bold text-slate-500 uppercase tracking-wide">O Sube desde tu PC:</span>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="text-xs file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer w-full text-slate-500"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-2">La imagen se optimizará y guardará automáticamente.</p>
                 </div>
 
                 <div>
@@ -1652,14 +2248,12 @@ function App() {
 
           ) : adminTab === 'reclamos' ? (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className="font-heading font-bold text-slate-900">Listado de Reclamos y Quejas</h3>
-                <button 
-                  onClick={() => fetchReclamosList()}
-                  className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1"
-                >
-                  Actualizar
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => fetchReclamosList()} className="text-xs font-heading font-semibold text-slate-500 hover:text-brand">Actualizar</button>
+                  <button onClick={clearReclamosHistory} className="text-xs font-heading font-bold bg-rose-50 text-rose-600 px-3 py-1.5 rounded hover:bg-rose-100 transition">🗑️ Vaciar todo</button>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -1672,6 +2266,7 @@ function App() {
                       <th className="px-6 py-3">Tipo</th>
                       <th className="px-6 py-3">Motivo</th>
                       <th className="px-6 py-3">Estado</th>
+                      <th className="px-6 py-3">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -1711,11 +2306,14 @@ function App() {
                             <option value="Resuelto">Resuelto</option>
                           </select>
                         </td>
+                        <td className="px-6 py-3.5">
+                          <button onClick={() => deleteReclamo(rec.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded transition">🗑️ Eliminar</button>
+                        </td>
                       </tr>
                     ))}
                     {reclamosList.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
+                        <td colSpan={7} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
                           No hay reclamos registrados.
                         </td>
                       </tr>
@@ -1781,67 +2379,13 @@ function App() {
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h3 className="font-heading font-bold text-slate-900">Historial de Pedidos</h3>
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                  <input
-                    type="text"
-                    placeholder="Buscar cliente, teléfono o estado..."
-                    value={adminOrderSearch}
-                    onChange={(e) => setAdminOrderSearch(e.target.value)}
-                    className="flex-1 md:w-64 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-brand bg-slate-50"
-                  />
-                  <button 
-                    onClick={exportOrdersCSV}
-                    className="text-xs font-heading font-bold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-100 flex items-center gap-1 transition"
-                  >
-                    ⬇️ Exportar CSV
-                  </button>
-                  <button 
-                    onClick={() => fetchPedidosList()}
-                    className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1 shrink-0"
-                  >
-                    Actualizar
-                  </button>
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                  <input type="text" placeholder="Buscar cliente, teléfono o estado..." value={adminOrderSearch} onChange={(e) => setAdminOrderSearch(e.target.value)} className="flex-1 md:w-64 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-brand bg-slate-50" />
+                  <button onClick={exportOrdersCSV} className="text-xs font-heading font-bold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-100 flex items-center gap-1 transition">⬇️ Exportar CSV</button>
+                  <button onClick={() => fetchPedidosList()} className="text-xs font-heading font-semibold text-slate-500 hover:text-brand shrink-0">Actualizar</button>
+                  <button onClick={clearPedidosHistory} className="text-xs font-heading font-bold bg-rose-50 text-rose-600 px-3 py-1.5 rounded hover:bg-rose-100 flex items-center gap-1 transition">🗑️ Vaciar historial</button>
                 </div>
               </div>
-
-              {/* Pedidos Dashboard */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-6 bg-slate-50 border-b border-slate-100">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Ganancias Hoy</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-brand mt-1">S/ {gananciasHoy.toFixed(2)}</p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Últimos 7 Días</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-emerald-600 mt-1">S/ {gananciasSemana.toFixed(2)}</p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Últimos 30 Días</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-sky-600 mt-1">S/ {gananciasMes.toFixed(2)}</p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Top Ventas</span>
-                  <ul className="mt-1 space-y-1">
-                    {topProducts.length > 0 ? topProducts.map((tp, idx) => (
-                      <li key={idx} className="text-xs font-bold text-slate-700 truncate" title={tp.nombre}>{tp.cantidad}x {tp.nombre}</li>
-                    )) : <li className="text-xs text-slate-400">Sin datos</li>}
-                  </ul>
-                </div>
-                <div className="bg-white border border-rose-200 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col">
-                  <div className="absolute top-0 right-0 w-8 h-8 bg-rose-500 rounded-bl-full opacity-20 z-0"></div>
-                  <div className="flex items-center justify-between z-10 relative">
-                    <span className="text-[10px] font-heading font-bold text-rose-500 uppercase tracking-wider">Alerta Stock</span>
-                    <span className="text-sm font-heading font-extrabold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">{lowStockProducts.length}</span>
-                  </div>
-                  <ul className="mt-2 space-y-1 overflow-y-auto max-h-[80px] pr-1 scrollbar-thin scrollbar-thumb-rose-200 scrollbar-track-transparent z-10 relative">
-                    {lowStockProducts.length > 0 ? lowStockProducts.map((p, idx) => (
-                      <li key={idx} className="text-[10px] font-bold text-slate-700 truncate" title={`${p.nombre} - Stock: ${p.stock || 0}`}>
-                        <span className="text-rose-500 mr-1">•</span>{p.nombre} <span className="text-rose-500 opacity-70">({p.stock || 0})</span>
-                      </li>
-                    )) : <li className="text-[10px] text-slate-400">Todo en orden ✅</li>}
-                  </ul>
-                </div>
-              </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -1852,64 +2396,45 @@ function App() {
                       <th className="px-6 py-3">Monto</th>
                       <th className="px-6 py-3">Detalle</th>
                       <th className="px-6 py-3">Estado</th>
+                      <th className="px-6 py-3">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredPedidos.map((ped) => (
                       <tr key={ped.id} className="hover:bg-slate-50/50 transition-colors align-top">
-                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
-                          {new Date(ped.fecha).toLocaleDateString()}
-                        </td>
+                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">{new Date(ped.fecha).toLocaleDateString()}</td>
                         <td className="px-6 py-3.5">
                           <p className="font-medium text-slate-800">{ped.nombre}</p>
                           <p className="text-xs text-slate-500">📱 {ped.telefono}</p>
                         </td>
                         <td className="px-6 py-3.5">
-                          <p className="text-[10px] uppercase font-bold text-slate-500">
-                            {ped.metodo_entrega ? ped.metodo_entrega.split('-')[0] : 'Envío'}
-                          </p>
-                          <p className="text-xs text-slate-700 max-w-[140px] truncate" title={ped.metodo_entrega}>
-                            {ped.metodo_entrega ? ped.metodo_entrega.split('-')[1] : 'Sin especificar'}
-                          </p>
+                          <p className="text-[10px] uppercase font-bold text-slate-500">{ped.metodo_entrega ? ped.metodo_entrega.split('-')[0] : 'Envío'}</p>
+                          <p className="text-xs text-slate-700 max-w-[140px] truncate">{ped.metodo_entrega ? ped.metodo_entrega.split('-')[1] : 'Sin especificar'}</p>
                         </td>
-                        <td className="px-6 py-3.5 font-bold text-slate-900 text-xs">
-                          S/ {ped.total.toFixed(2)}
-                        </td>
+                        <td className="px-6 py-3.5 font-bold text-slate-900 text-xs">S/ {ped.total.toFixed(2)}</td>
                         <td className="px-6 py-3.5 text-xs text-slate-600">
                           <ul className="list-disc pl-4">
-                            {ped.detalles && typeof ped.detalles === 'object' && ped.detalles.length > 0 ? (
-                              ped.detalles.map((d, i) => (
-                                <li key={i}>{d.quantity}x {d.nombre}</li>
-                              ))
-                            ) : (
-                              <li>Sin detalles</li>
-                            )}
+                            {ped.detalles && ped.detalles.length > 0 ? ped.detalles.map((d, i) => (
+                              <li key={i}>{d.quantity}x {d.nombre}</li>
+                            )) : <li>Sin detalles</li>}
                           </ul>
                         </td>
                         <td className="px-6 py-3.5">
-                          <select 
-                            value={ped.estado || 'Pendiente'}
-                            onChange={(e) => updateEstadoPedido(ped.id, e.target.value)}
-                            className={`text-xs font-bold rounded px-2 py-1 border-none focus:ring-0 ${
-                              ped.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' :
-                              ped.estado === 'En Camino' ? 'bg-sky-100 text-sky-700' :
-                              ped.estado === 'Cancelado' ? 'bg-rose-100 text-rose-700' :
-                              'bg-amber-100 text-amber-700'
-                            }`}
-                          >
+                          <select value={ped.estado || 'Pendiente'} onChange={(e) => updateEstadoPedido(ped.id, e.target.value)} className={`text-xs font-bold rounded px-2 py-1 border-none focus:ring-0 ${ped.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' : ped.estado === 'En Camino' ? 'bg-sky-100 text-sky-700' : ped.estado === 'Cancelado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                             <option value="Pendiente">Pendiente</option>
                             <option value="En Camino">En Camino</option>
                             <option value="Entregado">Entregado</option>
                             <option value="Cancelado">Cancelado</option>
                           </select>
                         </td>
+                        <td className="px-6 py-3.5">
+                          <button onClick={() => deletePedido(ped.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded transition">🗑️ Eliminar</button>
+                        </td>
                       </tr>
                     ))}
                     {filteredPedidos.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
-                          No hay pedidos que coincidan con la búsqueda.
-                        </td>
+                        <td colSpan={7} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">No hay pedidos que coincidan con la búsqueda.</td>
                       </tr>
                     )}
                   </tbody>
@@ -1918,14 +2443,12 @@ function App() {
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className="font-heading font-bold text-slate-900">Control de Reseñas</h3>
-                <button 
-                  onClick={() => fetchAdminResenas()}
-                  className="text-xs font-heading font-semibold text-slate-500 hover:text-brand flex items-center gap-1"
-                >
-                  Actualizar
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => fetchAdminResenas()} className="text-xs font-heading font-semibold text-slate-500 hover:text-brand">Actualizar</button>
+                  <button onClick={clearResenasHistory} className="text-xs font-heading font-bold bg-rose-50 text-rose-600 px-3 py-1.5 rounded hover:bg-rose-100 transition">🗑️ Vaciar todo</button>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -1937,6 +2460,7 @@ function App() {
                       <th className="px-6 py-3">Calificación</th>
                       <th className="px-6 py-3">Comentario</th>
                       <th className="px-6 py-3">Visibilidad</th>
+                      <th className="px-6 py-3">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -1962,11 +2486,14 @@ function App() {
                             {res.aprobado ? 'Aprobado (Público)' : 'Oculto'}
                           </button>
                         </td>
+                        <td className="px-6 py-3.5">
+                          <button onClick={() => deleteResena(res.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded transition">🗑️ Eliminar</button>
+                        </td>
                       </tr>
                     ))}
                     {resenasList.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
+                        <td colSpan={6} className="text-center py-10 text-slate-400 text-xs font-heading font-medium">
                           No hay reseñas registradas.
                         </td>
                       </tr>
@@ -1982,7 +2509,7 @@ function App() {
       {/* Trust Badges - estilo Kafi */}
       {viewMode === 'shop' && (
         <section className="bg-slate-900 py-4 md:py-6">
-          <div className="w-full px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-y-4 gap-x-2 md:gap-x-4">
+          <div className="w-full px-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-y-4 gap-x-2 md:gap-x-4">
             {[
               { title: 'Delivery', sub: 'a todo el Perú', icon: '🚚' },
               { title: 'Tu compra', sub: '100% segura', icon: '🔒' },
@@ -2000,8 +2527,8 @@ function App() {
                   }
                 }}
               >
-                <span className="text-2xl">{item.icon}</span>
-                <div className="flex flex-col items-start">
+                <span className="text-2xl flex-shrink-0 select-none">{item.icon}</span>
+                <div className="flex flex-col items-start min-w-0">
                   <h4 className="font-heading font-bold text-sm text-brand">{item.title}</h4>
                   <p className="text-xs text-white">{item.sub}</p>
                 </div>
@@ -2012,7 +2539,7 @@ function App() {
       )}
 
       {/* Footer - estilo Grupo Kafi con fondo negro */}
-      <footer className="bg-slate-900 pt-8 md:pt-10 pb-6 mt-auto">
+      <footer className="bg-slate-900 pt-8 md:pt-10 pb-6 mt-auto print:hidden">
         <div className="w-full px-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           <div>
             <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">📞 Teléfono</h4>
@@ -2079,8 +2606,18 @@ function App() {
         <div className="w-full px-4 pt-6 md:pt-8 pb-4 md:pb-6 border-t border-slate-800">
           <div className="text-center">
             <span className="font-cursive text-lg md:text-xl text-brand block mb-2 md:mb-3">YuMar Importaciones</span>
-            <p className="text-[9px] md:text-[10px] text-slate-400 font-heading">
-              © {new Date().getFullYear()} YuMar Importaciones. Todos los derechos reservados. Chiclayo - Perú.
+            <p className="text-[9px] md:text-[10px] text-slate-400 font-heading inline-flex items-center gap-1.5 justify-center">
+              © {new Date().getFullYear()} YuMar Importaciones. Todos los derechos reservados.
+              <button
+                onClick={() => { setViewMode('admin'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                title="Panel de administración"
+                className="inline-flex items-center text-slate-600 hover:text-slate-300 transition-colors duration-200 group"
+                aria-label="Panel de administración"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 group-hover:rotate-45 transition-transform duration-300">
+                  <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.855 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.57.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
+                </svg>
+              </button>
             </p>
           </div>
         </div>
@@ -2287,53 +2824,28 @@ function App() {
             {/* Footer Pricing & Actions */}
             {cart.length > 0 && (
               <div className="p-6 border-t border-slate-100 bg-slate-50/50">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-6">
                   <span className="text-xs font-heading font-bold text-slate-500 uppercase">Subtotal</span>
                   <span className="font-heading font-extrabold text-slate-950 text-lg">
                     S/ {cartTotal.toFixed(2)}
                   </span>
                 </div>
                 
-                <form onSubmit={handleCheckout} className="space-y-3 mb-4 border-t border-slate-200 pt-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tus datos para el pedido</p>
-                  <input type="text" placeholder="Nombre completo" required value={checkoutForm.nombre} onChange={e => setCheckoutForm({...checkoutForm, nombre: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
-                  <input type="tel" placeholder="Teléfono / WhatsApp" required value={checkoutForm.telefono} onChange={e => setCheckoutForm({...checkoutForm, telefono: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
-                  
-                  {/* Método de entrega */}
-                  <div className="pt-2 border-t border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Método de Entrega</p>
-                    <div className="flex flex-col gap-2 mb-2">
-                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                        <input type="radio" name="tipoEntrega" checked={checkoutForm.tipoEntrega === 'Envío a domicilio'} onChange={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'Envío a domicilio', direccion: ''})} className="accent-brand scale-110" />
-                        Envío a domicilio
-                      </label>
-                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                        <input type="radio" name="tipoEntrega" checked={checkoutForm.tipoEntrega === 'Recojo en tienda'} onChange={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'Recojo en tienda', direccion: 'Sede 1'})} className="accent-brand scale-110" />
-                        Recojo en tienda
-                      </label>
-                    </div>
-
-                    {checkoutForm.tipoEntrega === 'Envío a domicilio' ? (
-                      <input type="text" placeholder="Ingresa tu dirección completa" required value={checkoutForm.direccion} onChange={e => setCheckoutForm({...checkoutForm, direccion: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand" />
-                    ) : (
-                      <select value={checkoutForm.direccion} onChange={e => setCheckoutForm({...checkoutForm, direccion: e.target.value})} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-brand bg-white">
-                        <option value="Sede 1">Sede 1</option>
-                        <option value="Sede 2">Sede 2</option>
-                        <option value="Sede 3">Sede 3</option>
-                      </select>
-                    )}
-                  </div>
-
-                  <button type="submit" className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white py-3 rounded-xl font-heading font-bold text-sm shadow-lg shadow-brand/10 transition mt-2">
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z" />
-                    </svg>
-                    <span>Pedir por WhatsApp</span>
-                  </button>
-                </form>
+                <button 
+                  onClick={() => {
+                    setViewMode('checkout');
+                    setCartOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white py-3.5 rounded-xl font-heading font-bold text-sm shadow-lg shadow-brand/10 transition"
+                >
+                  <span>Finalizar Compra</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
                 
-                <p className="text-[10px] text-center text-slate-400 mt-3">
-                  Te redirigiremos a WhatsApp para finalizar la entrega y el pago con un asesor de Yumar.
+                <p className="text-[10px] text-center text-slate-400 mt-4">
+                  Completa tu pedido y datos de envío en el siguiente paso.
                 </p>
               </div>
             )}

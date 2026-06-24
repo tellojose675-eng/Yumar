@@ -13,7 +13,8 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Serve static files from the dist directory (for production)
 app.use(express.static(join(__dirname, 'dist')));
@@ -78,6 +79,7 @@ const initializeDatabase = async () => {
         correo TEXT,
         total REAL NOT NULL,
         detalles JSONB,
+        metodo_pago TEXT,
         fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         estado TEXT DEFAULT 'Pendiente'
       )
@@ -440,15 +442,19 @@ app.get('/api/pedidos', async (req, res) => {
 // POST /api/pedidos
 app.post('/api/pedidos', async (req, res) => {
   try {
-    const { nombre, telefono, correo, total, detalles, metodo_entrega } = req.body;
+    const { nombre, telefono, correo, total, detalles, metodo_entrega, metodo_pago } = req.body;
     
     try {
       await pool.query("ALTER TABLE pedidos ADD COLUMN metodo_entrega TEXT");
     } catch (e) { /* ignore if already exists */ }
+    
+    try {
+      await pool.query("ALTER TABLE pedidos ADD COLUMN metodo_pago TEXT");
+    } catch (e) { /* ignore if already exists */ }
 
     const result = await pool.query(
-      "INSERT INTO pedidos (nombre, telefono, correo, total, detalles, metodo_entrega) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [nombre, telefono, correo, total, JSON.stringify(detalles), metodo_entrega || '']
+      "INSERT INTO pedidos (nombre, telefono, correo, total, detalles, metodo_entrega, metodo_pago) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+      [nombre, telefono, correo, total, JSON.stringify(detalles), metodo_entrega || '', metodo_pago || '']
     );
 
     // Decrease stock
@@ -513,6 +519,32 @@ app.patch('/api/pedidos/:id/estado', async (req, res) => {
   }
 });
 
+// DELETE /api/pedidos/:id - Delete a single order
+app.delete('/api/pedidos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("DELETE FROM pedidos WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.json({ message: "Order deleted successfully", id });
+  } catch (err) {
+    console.error('Error deleting order:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/pedidos - Delete/Clear all orders (vaciar historial)
+app.delete('/api/pedidos', async (req, res) => {
+  try {
+    await pool.query("DELETE FROM pedidos");
+    res.json({ message: "All orders cleared successfully" });
+  } catch (err) {
+    console.error('Error clearing orders:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/resenas/producto/:id
 app.get('/api/resenas/producto/:id', async (req, res) => {
   try {
@@ -560,7 +592,51 @@ app.patch('/api/resenas/:id/aprobado', async (req, res) => {
   }
 });
 
-// CATEGORIAS ROUTES
+// DELETE /api/reclamos/:id - Delete a single reclamo
+app.delete('/api/reclamos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("DELETE FROM reclamos WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Reclamo not found" });
+    res.json({ message: "Reclamo deleted", id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/reclamos - Clear all reclamos
+app.delete('/api/reclamos', async (req, res) => {
+  try {
+    await pool.query("DELETE FROM reclamos");
+    res.json({ message: "All reclamos cleared" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/resenas/:id - Delete a single resena
+app.delete('/api/resenas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("DELETE FROM resenas WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Resena not found" });
+    res.json({ message: "Resena deleted", id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/resenas - Clear all resenas
+app.delete('/api/resenas', async (req, res) => {
+  try {
+    await pool.query("DELETE FROM resenas");
+    res.json({ message: "All resenas cleared" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 // GET /api/categorias
 app.get('/api/categorias', async (req, res) => {

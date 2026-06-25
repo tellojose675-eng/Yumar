@@ -1289,9 +1289,9 @@ function App() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-5">
                     {products.map((product) => (
-                      <div key={product.id} className="kafi-card bg-white group">
+                      <div key={product.id} className="kafi-card bg-white group flex flex-col">
                         <div
-                          className="aspect-square bg-slate-50 border border-slate-100 rounded overflow-hidden relative cursor-pointer"
+                          className="aspect-square bg-slate-50 overflow-hidden relative cursor-pointer"
                           onClick={() => openProduct(product)}
                         >
                           {product.badge && (
@@ -1307,9 +1307,9 @@ function App() {
                           />
                         </div>
 
-                        <div className="pt-3 px-2.5 pb-2.5 flex flex-col justify-between flex-1">
+                        <div className="pt-3 px-2.5 pb-2.5 flex flex-col flex-1">
                           <h3
-                            className="font-heading font-bold text-slate-800 text-sm md:text-base uppercase line-clamp-2 leading-snug cursor-pointer group-hover:text-brand transition-colors text-left"
+                            className="font-heading font-bold text-slate-800 text-sm md:text-base uppercase line-clamp-2 leading-snug cursor-pointer group-hover:text-brand transition-colors text-left flex-1"
                             onClick={() => openProduct(product)}
                           >
                             {product.nombre}

@@ -177,6 +177,26 @@ function App() {
     fetchAllProducts();
   }, []);
 
+  // ── Auto-polling: refresca datos sin recargar la página ──
+  // Productos del catálogo: cada 30 segundos (solo en vista tienda)
+  useEffect(() => {
+    if (viewMode !== 'shop' || selectedProduct) return;
+    const interval = setInterval(() => {
+      fetchProducts(currentCategory, appliedSearch);
+      fetchAllProducts();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [viewMode, selectedProduct, currentCategory, appliedSearch]);
+
+  // Reseñas del producto abierto: cada 20 segundos
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const interval = setInterval(() => {
+      fetchProductResenas(selectedProduct.id);
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [selectedProduct]);
+
   const fetchReclamosList = async () => {
     try {
       const res = await fetch('/api/reclamos');
@@ -235,6 +255,18 @@ function App() {
       if (adminTab === 'pedidos') fetchPedidosList();
       if (adminTab === 'resenas') fetchAdminResenas();
     }
+  }, [viewMode, isAdminAuthenticated, adminTab]);
+
+  // Admin panel: refresca la pestaña activa cada 15 segundos
+  useEffect(() => {
+    if (viewMode !== 'admin' || !isAdminAuthenticated) return;
+    const interval = setInterval(() => {
+      if (adminTab === 'productos') { fetchProducts(); fetchAllProducts(); }
+      if (adminTab === 'reclamos') fetchReclamosList();
+      if (adminTab === 'pedidos') fetchPedidosList();
+      if (adminTab === 'resenas') fetchAdminResenas();
+    }, 15000);
+    return () => clearInterval(interval);
   }, [viewMode, isAdminAuthenticated, adminTab]);
 
   // Toast triggers

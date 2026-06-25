@@ -1441,9 +1441,13 @@ function App() {
                   <input 
                     type="text" 
                     required 
-                    placeholder="Número de documento"
-                    value={checkoutForm.numDoc} 
-                    onChange={e => setCheckoutForm({...checkoutForm, numDoc: e.target.value})}
+                    placeholder={checkoutForm.tipoDoc === 'DNI' ? '8 dígitos' : 'Número de documento'}
+                    value={checkoutForm.numDoc}
+                    maxLength={checkoutForm.tipoDoc === 'DNI' ? 8 : checkoutForm.tipoDoc === 'RUC' ? 11 : 20}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setCheckoutForm({...checkoutForm, numDoc: val});
+                    }}
                     className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
                   />
                 </div>
@@ -1455,8 +1459,13 @@ function App() {
                   <input 
                     type="tel" 
                     required 
+                    placeholder="9 dígitos"
+                    maxLength={9}
                     value={checkoutForm.telefono} 
-                    onChange={e => setCheckoutForm({...checkoutForm, telefono: e.target.value})}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setCheckoutForm({...checkoutForm, telefono: val});
+                    }}
                     className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
                   />
                 </div>
@@ -1795,12 +1804,28 @@ function App() {
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => {
+                  const fecha = completedOrder.fecha
+                    ? new Date(completedOrder.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : new Date().toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                  const itemsRows = (completedOrder.items || []).map(item =>
+                    `<tr><td style="padding:6px 0;color:#475569;border-bottom:1px solid #f1f5f9">${item.quantity}x ${item.nombre}</td><td style="padding:6px 0;font-weight:700;text-align:right;border-bottom:1px solid #f1f5f9">S/ ${(item.precio * item.quantity).toFixed(2)}</td></tr>`
+                  ).join('');
+                  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Voucher Pedido #${completedOrder.id || ''} - YuMar Importaciones</title><style>body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;padding:24px;color:#1e293b;background:#fff}h1{font-size:22px;text-align:center;text-transform:uppercase;margin-bottom:4px}p{margin:4px 0;font-size:13px}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:11px;color:#94a3b8;text-transform:uppercase;padding-bottom:8px}.total-row td{padding-top:12px;font-size:16px;font-weight:800}.label{font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-top:16px;margin-bottom:2px}.divider{border:none;border-top:1px solid #e2e8f0;margin:16px 0}.brand{color:#e21a83}.footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:24px}</style></head><body><div style="text-align:center;margin-bottom:16px"><div style="display:inline-block;background:#dcfce7;border-radius:50%;width:56px;height:56px;line-height:56px;font-size:28px">✔</div><h1>¡Pedido Confirmado!</h1><p style="color:#64748b">Orden <strong>#${completedOrder.id || ''}</strong></p><p style="color:#64748b">YuMar Importaciones · RUC: <strong>20614188465</strong></p><p style="color:#64748b">Fecha: <strong>${fecha}</strong></p></div><hr class="divider"><p class="label">Cliente</p><p><strong>${completedOrder.clientName}</strong> · ${completedOrder.docType}: ${completedOrder.docNum}</p><p class="label">Contacto</p><p>${completedOrder.telefono}${completedOrder.correo ? ' · ' + completedOrder.correo : ''}</p><p class="label">Entrega</p><p>${completedOrder.deliveryType === 'domicilio' ? 'Envío a domicilio' : 'Recojo en tienda'} — ${completedOrder.addressInfo}</p><p class="label">Método de Pago</p><p>${completedOrder.paymentMethod}</p><hr class="divider"><table><thead><tr><th>Producto</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>${itemsRows}<tr class="total-row"><td style="padding-top:12px">TOTAL A PAGAR</td><td style="padding-top:12px;text-align:right;color:#e21a83">S/ ${completedOrder.subtotal?.toFixed(2)}</td></tr></tbody></table><hr class="divider"><p class="footer">Envía este comprobante por WhatsApp para confirmar tu pedido. ¡Gracias por comprar en YuMar Importaciones!</p></body></html>`;
+                  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `voucher-yumar-pedido-${completedOrder.id || 'nuevo'}.html`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                }}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-heading font-bold text-sm flex items-center justify-center gap-2 transition"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.728 6.75A.75.75 0 0 1 7.266 7h9.468a.75.75 0 0 1 .538.22l2.39 2.39A.75.75 0 0 1 19.882 10H4.118a.75.75 0 0 1-.53-.22l2.39-2.39A.75.75 0 0 1 6.728 6.75Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10.5v6a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 16.5v-6M9.75 13.5v-3m0 0v-3m0 3h4.5m-4.5 0v3m0-3H5.25" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
                 Descargar Voucher
               </button>

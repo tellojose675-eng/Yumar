@@ -63,10 +63,10 @@ function App() {
     numDoc: '',
     telefono: '', 
     correo: '', 
-    tipoEntrega: 'domicilio', // 'domicilio' or 'tienda'
+    tipoEntrega: 'tienda', // only 'tienda'
     departamento: 'Lima Metropolitana',
     distrito: '',
-    direccion: '',
+    direccion: 'Santa Ana',
     metodoPago: 'yape_plin'
   });
   const [completedOrder, setCompletedOrder] = useState(null);
@@ -338,15 +338,13 @@ function App() {
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    if (!checkoutForm.nombre || !checkoutForm.apellidos || !checkoutForm.telefono || (checkoutForm.tipoEntrega === 'domicilio' && (!checkoutForm.direccion || !checkoutForm.distrito))) {
+    if (!checkoutForm.nombre || !checkoutForm.apellidos || !checkoutForm.telefono || !checkoutForm.direccion) {
       showToast("Por favor ingresa todos los campos obligatorios.");
       return;
     }
     
     try {
-      const metodoEntregaStr = checkoutForm.tipoEntrega === 'domicilio' 
-        ? `Envío a domicilio - ${checkoutForm.direccion}, ${checkoutForm.distrito}, ${checkoutForm.departamento} (${checkoutForm.apellidos}, ${checkoutForm.tipoDoc}: ${checkoutForm.numDoc}, Pago: ${checkoutForm.metodoPago === 'yape_plin' ? 'Yape/Plin' : 'Transferencia'})`
-        : `Recojo en tienda - Sede: ${checkoutForm.direccion} (${checkoutForm.apellidos}, ${checkoutForm.tipoDoc}: ${checkoutForm.numDoc}, Pago: ${checkoutForm.metodoPago === 'yape_plin' ? 'Yape/Plin' : 'Transferencia'})`;
+      const metodoEntregaStr = `Recojo en tienda - Sede: ${checkoutForm.direccion} (${checkoutForm.apellidos}, ${checkoutForm.tipoDoc}: ${checkoutForm.numDoc}, Pago: ${checkoutForm.metodoPago === 'yape_plin' ? 'Yape/Plin' : 'Transferencia'})`;
 
       // Save order to DB
       const response = await fetch('/api/pedidos', {
@@ -372,10 +370,8 @@ function App() {
         docNum: checkoutForm.numDoc,
         telefono: checkoutForm.telefono,
         correo: checkoutForm.correo,
-        deliveryType: checkoutForm.tipoEntrega,
-        addressInfo: checkoutForm.tipoEntrega === 'domicilio' 
-          ? `${checkoutForm.direccion}, ${checkoutForm.distrito}, ${checkoutForm.departamento}`
-          : checkoutForm.direccion,
+        deliveryType: 'tienda',
+        addressInfo: checkoutForm.direccion,
         paymentMethod: checkoutForm.metodoPago === 'yape_plin' ? 'Yape / Plin' : 'Depósito o Transferencia Bancaria',
         items: cart,
         subtotal: cartTotal
@@ -1401,33 +1397,16 @@ function App() {
               {/* Delivery Option Selector */}
               <div className="space-y-3">
                 <label className="block text-xs font-bold text-slate-700 uppercase">Método de entrega <span className="text-red-500">*</span></label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'domicilio', direccion: '', departamento: 'Lima Metropolitana', distrito: ''})}
-                    className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition text-left ${checkoutForm.tipoEntrega === 'domicilio' ? 'border-brand bg-brand/5 text-brand font-bold' : 'border-slate-200 hover:border-slate-350 text-slate-650 bg-white'}`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.129-1.125v-3.02M18 18.75V15m-10.5-6h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6h3.15a1.5 1.5 0 0 1 1.06.44l1.89 1.89a1.5 1.5 0 0 1 .44 1.06v5.1a1.5 1.5 0 0 1-1.5 1.5h-9a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 12 7.5Z" />
-                    </svg>
-                    <div>
-                      <span className="text-xs uppercase block">Envío a domicilio</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Recibe en tu dirección</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCheckoutForm({...checkoutForm, tipoEntrega: 'tienda', direccion: 'Santa Ana'})}
-                    className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition text-left ${checkoutForm.tipoEntrega === 'tienda' ? 'border-brand bg-brand/5 text-brand font-bold' : 'border-slate-200 hover:border-slate-350 text-slate-650 bg-white'}`}
-                  >
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl border-2 transition text-left border-brand bg-brand/5 text-brand font-bold">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19a1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
                     </svg>
                     <div>
                       <span className="text-xs uppercase block">Recojo en tienda</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Recoge gratis en tienda</span>
+                      <span className="text-[10px] text-brand/80 font-normal">Recoge gratis en tienda</span>
                     </div>
-                  </button>
+                  </div>
                 </div>
               </div>
 
@@ -1512,54 +1491,6 @@ function App() {
                 </div>
               </div>
 
-              {checkoutForm.tipoEntrega === 'domicilio' ? (
-                <div className="space-y-4 pt-4 border-t border-slate-100 animate-fade-in">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dirección de envío</h3>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Departamento <span className="text-red-500">*</span></label>
-                    <select 
-                      value={checkoutForm.departamento} 
-                      onChange={e => setCheckoutForm({...checkoutForm, departamento: e.target.value})}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white font-semibold"
-                    >
-                      <option value="Lima Metropolitana">Lima Metropolitana</option>
-                      <option value="Callao">Callao</option>
-                      <option value="Ancash">Ancash</option>
-                      <option value="Arequipa">Arequipa</option>
-                      <option value="Cusco">Cusco</option>
-                      <option value="La Libertad">La Libertad</option>
-                      <option value="Lambayeque">Lambayeque</option>
-                      <option value="Piura">Piura</option>
-                      <option value="Ica">Ica</option>
-                      <option value="Tacna">Tacna</option>
-                      <option value="Otros Departamentos">Otros Departamentos</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Distrito / Ciudad <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={checkoutForm.distrito} 
-                      onChange={e => setCheckoutForm({...checkoutForm, distrito: e.target.value})}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Dirección completa <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required 
-                      placeholder="Calle, avenida, condominio, lote, etc."
-                      value={checkoutForm.direccion} 
-                      onChange={e => setCheckoutForm({...checkoutForm, direccion: e.target.value})}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-brand bg-white"
-                    />
-                  </div>
-                </div>
-              ) : (
                 <div className="space-y-4 pt-4 border-t border-slate-100 animate-fade-in">
                   <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tienda de recojo</h3>
                   <div>
@@ -1576,7 +1507,6 @@ function App() {
                     </select>
                   </div>
                 </div>
-              )}
             </div>
 
             {/* Right Column: Tu Pedido */}

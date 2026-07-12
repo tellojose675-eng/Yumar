@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
 
+const optimizeCloudinaryUrl = (url) => {
+  if (!url || typeof url !== 'string') return url;
+  if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
+    if (url.includes('/upload/f_auto,q_auto/')) return url;
+    return url.replace('/upload/', '/upload/f_auto,q_auto/');
+  }
+  return url;
+};
+
 function App() {
   // Application State
   const [products, setProducts] = useState([]);
@@ -81,6 +90,9 @@ function App() {
   // Admin Search State
   const [adminProductSearch, setAdminProductSearch] = useState('');
   const [adminOrderSearch, setAdminOrderSearch] = useState('');
+
+  // Cloudinary upload state
+  const [imageUploading, setImageUploading] = useState(false);
 
   // Categories State
   const [categoriesList, setCategoriesList] = useState(['Todos', 'Tecnología', 'Hogar', 'Belleza']);
@@ -484,43 +496,41 @@ function App() {
     }, 100);
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        
-        const MAX_SIZE = 800;
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height *= MAX_SIZE / width;
-            width = MAX_SIZE;
-          }
-        } else {
-          if (height > MAX_SIZE) {
-            width *= MAX_SIZE / height;
-            height = MAX_SIZE;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setAdminForm(prev => ({ ...prev, imagen: dataUrl }));
-        showToast('Imagen optimizada y cargada correctamente');
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset) {
+      showToast('Error: configura VITE_CLOUDINARY_CLOUD_NAME y VITE_CLOUDINARY_UPLOAD_PRESET en .env');
+      return;
+    }
+
+    setImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+
+      if (!response.ok) throw new Error('Error al subir a Cloudinary');
+
+      const data = await response.json();
+      // Store the optimized Cloudinary URL
+      setAdminForm(prev => ({ ...prev, imagen: data.secure_url }));
+      showToast('✅ Imagen subida a Cloudinary correctamente');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Error al subir imagen. Revisa tu preset de Cloudinary.');
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   const handleDeleteProduct = async (id, name) => {
@@ -1007,8 +1017,9 @@ function App() {
                   <div className="lg:col-span-5">
                     <div className="bg-white border border-slate-100 rounded-lg overflow-hidden aspect-square relative">
                       <img
-                        src={selectedProduct.imagen || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=600&q=80"}
+                        src={optimizeCloudinaryUrl(selectedProduct.imagen || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=600&q=80")}
                         alt={selectedProduct.nombre}
+                        loading="lazy"
                         className="w-full h-full object-contain p-4"
                       />
                     </div>
@@ -1105,8 +1116,9 @@ function App() {
                               className="flex gap-3 w-full text-left group"
                             >
                               <img
-                                src={item.imagen}
+                                src={optimizeCloudinaryUrl(item.imagen)}
                                 alt=""
+                                loading="lazy"
                                 className="w-14 h-14 object-cover rounded border border-slate-100 flex-shrink-0"
                               />
                               <div className="min-w-0">
@@ -1185,7 +1197,7 @@ function App() {
                                 {prod.badge}
                               </span>
                             )}
-                            <img src={prod.imagen} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            <img src={optimizeCloudinaryUrl(prod.imagen)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           </div>
                           <p className="text-sm font-heading font-bold text-slate-800 uppercase line-clamp-2 leading-snug group-hover:text-brand transition px-1.5 mt-1">
                             {prod.nombre}
@@ -1328,7 +1340,7 @@ function App() {
                             </span>
                           )}
                           <img
-                            src={product.imagen || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&q=80"}
+                            src={optimizeCloudinaryUrl(product.imagen || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&q=80")}
                             alt={product.nombre}
                             loading="lazy"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -1540,8 +1552,9 @@ function App() {
                       <div key={item.id} className="flex items-center justify-between py-3 gap-3">
                         <div className="flex items-center gap-3">
                           <img 
-                            src={item.imagen} 
+                            src={optimizeCloudinaryUrl(item.imagen)} 
                             alt="" 
+                            loading="lazy"
                             className="w-12 h-12 object-cover rounded border border-slate-200 bg-white flex-shrink-0"
                           />
                           <div className="min-w-0">
@@ -2057,26 +2070,60 @@ function App() {
 
                 <div>
                   <label className="block text-xs font-heading font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                    Imagen URL
+                    Imagen del Producto
                   </label>
+
+                  {/* Cloudinary Direct Upload */}
+                  <div className="p-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl mb-3">
+                    <p className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wide mb-2">Subir directo a Cloudinary</p>
+                    <label className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-lg font-heading font-bold text-sm cursor-pointer transition ${
+                      imageUploading
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-brand text-white hover:bg-brand-hover shadow-md shadow-brand/20'
+                    }`}>
+                      {imageUploading ? (
+                        <>
+                          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                          </svg>
+                          Subiendo...
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                          </svg>
+                          Elegir foto y subir
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={imageUploading}
+                        className="hidden"
+                      />
+                    </label>
+                    {adminForm.imagen && adminForm.imagen.includes('cloudinary.com') && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <img src={optimizeCloudinaryUrl(adminForm.imagen)} alt="preview" className="w-12 h-12 object-cover rounded-lg border border-slate-200" />
+                        <p className="text-[10px] text-emerald-600 font-bold">✅ Imagen subida en Cloudinary</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Or paste URL */}
+                  <p className="text-[10px] font-heading font-semibold text-slate-400 uppercase tracking-wide mb-1.5">O pega una URL directamente:</p>
                   <input 
                     type="url" 
                     name="imagen"
                     value={adminForm.imagen}
                     onChange={handleAdminFormChange}
-                    placeholder="https://images.unsplash.com/photo-..." 
-                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand mb-3"
+                    placeholder="https://res.cloudinary.com/dtptjmj07/image/upload/..." 
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand"
                   />
-                  <div className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                    <span className="text-[10px] font-heading font-bold text-slate-500 uppercase tracking-wide">O Sube desde tu PC:</span>
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="text-xs file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer w-full text-slate-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-2">La imagen se optimizará y guardará automáticamente.</p>
+                  <p className="text-[10px] text-slate-400 mt-1.5">Las imágenes de Cloudinary se optimizan automáticamente (f_auto, q_auto).</p>
                 </div>
 
                 <div>
@@ -2177,8 +2224,9 @@ function App() {
                         <tr key={prod.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-3.5">
                             <img 
-                              src={prod.imagen} 
+                              src={optimizeCloudinaryUrl(prod.imagen)} 
                               alt="" 
+                              loading="lazy"
                               className="w-10 h-10 object-cover rounded-lg border border-slate-200"
                             />
                           </td>
@@ -2744,8 +2792,9 @@ function App() {
                   
                   {/* Thumbnail */}
                   <img 
-                    src={item.imagen} 
+                    src={optimizeCloudinaryUrl(item.imagen)} 
                     alt="" 
+                    loading="lazy"
                     className="w-16 h-16 object-cover rounded-lg border border-slate-200 bg-white"
                   />
                   

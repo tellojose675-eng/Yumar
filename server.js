@@ -4,6 +4,27 @@ import pg from 'pg';
 const { Pool } = pg;
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { readFileSync, existsSync } from 'fs';
+
+// Load .env manually (no dotenv dependency needed)
+const __filenameTemp = fileURLToPath(import.meta.url);
+const __dirnameTemp = dirname(__filenameTemp);
+const envPath = join(__dirnameTemp, '.env');
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const idx = trimmed.indexOf('=');
+      if (idx > 0) {
+        const key = trimmed.substring(0, idx).trim();
+        const value = trimmed.substring(idx + 1).trim();
+        if (!process.env[key]) process.env[key] = value;
+      }
+    }
+  });
+  console.log('✅ .env loaded');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -19,10 +40,12 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Serve static files from the dist directory (for production)
 app.use(express.static(join(__dirname, 'dist')));
 
-// PostgreSQL Database Setup
+// PostgreSQL Database Setup (Neon compatible)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/yumar',
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL
+    ? { rejectUnauthorized: false }
+    : false
 });
 
 const initializeDatabase = async () => {
@@ -123,7 +146,7 @@ const initializeDatabase = async () => {
       await seedProducts();
     }
   } catch (err) {
-    console.error('Error initializing database:', err.message);
+    console.error('Error initializing database:', err.message, err.code, err);
   }
 };
 

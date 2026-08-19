@@ -91,6 +91,17 @@ function App() {
   const [adminProductSearch, setAdminProductSearch] = useState('');
   const [adminOrderSearch, setAdminOrderSearch] = useState('');
 
+  // POS (Point of Sale) State
+  const [posCart, setPosCart] = useState([]);
+  const [posClient, setPosClient] = useState('Venta Mostrador');
+  const [posPhone, setPosPhone] = useState('');
+  const [posPaymentMethod, setPosPaymentMethod] = useState('Efectivo');
+  const [posCashReceived, setPosCashReceived] = useState('');
+  const [posDiscount, setPosDiscount] = useState('');
+  const [posSearch, setPosSearch] = useState('');
+  const [posCategory, setPosCategory] = useState('Todos');
+  const [posActiveVoucher, setPosActiveVoucher] = useState(null);
+
   // Cloudinary upload state
   const [imageUploading, setImageUploading] = useState(false);
 
@@ -532,6 +543,175 @@ function App() {
       setImageUploading(false);
     }
   };
+
+  const updateStockQuickly = async (id, newStock) => {
+    if (newStock < 0) return;
+    try {
+      const res = await fetch(`/api/productos/${id}/stock`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock: newStock })
+      });
+      if (!res.ok) throw new Error('Error al actualizar stock');
+      
+      const updatedProduct = await res.json();
+      
+      const updateProductList = (list) => list.map(p => p.id === id ? updatedProduct : p);
+      setProducts(prev => updateProductList(prev));
+      setAllProducts(prev => updateProductList(prev));
+      if (selectedProduct && selectedProduct.id === id) {
+        setSelectedProduct(updatedProduct);
+      }
+      
+      showToast(`Stock actualizado a ${newStock}`);
+    } catch (err) {
+      console.error(err);
+      showToast("Error al actualizar el stock en el servidor");
+    }
+  };
+
+  // POS Cart Actions
+  const addToPosCart = (product) => {
+    const maxStock = product.stock || 0;
+    if (maxStock <= 0) {
+      showToast("Producto agotado. No se puede vender.");
+      return;
+    }
+    
+    setPosCart((prevCart) => {
+      const existingItem = prevCart.find((item) => item.id === product.id);
+      const currentQty = existingItem ? existingItem.quantity : 0;
+      
+      if (currentQty + 1 > maxStock) {
+        showToast(`Stock insuficiente. Solo quedan ${maxStock} unidades.`);
+        return prevCart;
+      }
+      
+      if (existingItem) {
+        return prevCart.map((item) =>
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      showToast(`Agregado a la venta: ${product.nombre}`);
+      return [...prevCart, { ...product, quantity: 1 }];
+    });
+  };
+
+  const updatePosCartQuantity = (id, change) => {
+    const productInfo = allProducts.find(p => p.id === id);
+    const maxStock = productInfo ? (productInfo.stock || 0) : 0;
+    
+    setPosCart((prevCart) =>
+      prevCart
+        .map((item) => {
+          if (item.id === id) {
+            const newQty = item.quantity + change;
+            if (newQty > maxStock) {
+              showToast(`Stock insuficiente. Solo quedan ${maxStock} unidades.`);
+              return item;
+            }
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean)
+    );
+  };
+
+  const removeFromPosCart = (id, name) => {
+    setPosCart((prevCart) => prevCart.filter((item) => item.id !== id));
+    showToast(`Eliminado de la venta: ${name}`);
+  };
+
+  const handlePosCheckout = async (e) => {
+    if (e) e.preventDefault();
+    if (posCart.length === 0) {
+      showToast("El carrito del POS está vacío.");
+      return;
+    }
+
+    // Verify stock one more time before checkout
+    for (const item of posCart) {
+      const dbProd = allProducts.find(p => p.id === item.id);
+      const currentStock = dbProd ? (dbProd.stock || 0) : 0;
+      if (item.quantity > currentStock) {
+        showToast(`Error: "${item.nombre}" supera el stock disponible (${currentStock}).`);
+        return;
+      }
+    }
+
+    const discountVal = parseFloat(posDiscount) || 0;
+    const posSubtotal = posCart.reduce((sum, item) => sum + item.precio * item.quantity, 0);
+    const posTotal = Math.max(0, posSubtotal - discountVal);
+
+    try {
+      const metodoEntregaStr = "Venta POS (Presencial)";
+      const response = await fetch('/api/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: posClient || 'Venta Mostrador',
+          telefono: posPhone || '',
+          correo: 'pos@yumar.com',
+          total: posTotal,
+          detalles: posCart,
+          metodo_entrega: metodoEntregaStr,
+          metodo_pago: posPaymentMethod,
+          estado: 'Completado'
+        })
+      });
+
+      if (!response.ok) throw new Error('Error al registrar venta POS');
+
+      const savedPedido = await response.json();
+
+      // Show Voucher Modal
+      setPosActiveVoucher({
+        id: savedPedido.id,
+        fecha: savedPedido.fecha || new Date().toISOString(),
+        cliente: posClient || 'Venta Mostrador',
+        telefono: posPhone || '',
+        detalles: posCart,
+        subtotal: posSubtotal,
+        descuento: discountVal,
+        total: posTotal,
+        metodoPago: posPaymentMethod,
+        efectivoRecibido: parseFloat(posCashReceived) || 0,
+        cambio: posPaymentMethod === 'Efectivo' 
+          ? Math.max(0, (parseFloat(posCashReceived) || 0) - posTotal) 
+          : 0
+      });
+
+      // Clear POS cart and form
+      setPosCart([]);
+      setPosClient('Venta Mostrador');
+      setPosPhone('');
+      setPosCashReceived('');
+      setPosDiscount('');
+
+      showToast("Venta registrada con éxito.");
+
+      // Refresh product stock list immediately
+      fetchProducts();
+      fetchAllProducts();
+      fetchPedidosList(); // Refresh order history in admin panel
+      
+      // Update local states instantly so POS UI updates without waiting
+      const updateStockLocally = (productList) => productList.map(p => {
+        const cartItem = posCart.find(c => c.id === p.id);
+        if (cartItem) {
+          return { ...p, stock: Math.max(0, (p.stock || 0) - cartItem.quantity) };
+        }
+        return p;
+      });
+      setProducts(prev => updateStockLocally(prev));
+      setAllProducts(prev => updateStockLocally(prev));
+    } catch (err) {
+      console.error(err);
+      showToast("Error al procesar la venta POS.");
+    }
+  };
+
 
   const handleDeleteProduct = async (id, name) => {
     if (!confirm(`¿Estás seguro de que deseas eliminar "${name}"?`)) return;
@@ -1189,14 +1369,18 @@ function App() {
                         <button
                           key={prod.id}
                           onClick={() => openProduct(prod)}
-                          className="kafi-card bg-white text-left group"
+                          className={`kafi-card bg-white text-left group ${prod.stock <= 0 ? 'opacity-70' : ''}`}
                         >
                           <div className="aspect-square bg-slate-50 border border-slate-100 rounded overflow-hidden mb-2 relative">
-                            {prod.badge && (
+                            {prod.stock <= 0 ? (
+                              <span className="absolute top-1 left-1 z-10 bg-slate-500 text-white text-[8px] font-bold uppercase px-1.5 py-0.5">
+                                AGOTADO
+                              </span>
+                            ) : prod.badge ? (
                               <span className="absolute top-1 left-1 z-10 bg-brand text-white text-[8px] font-bold uppercase px-1.5 py-0.5">
                                 {prod.badge}
                               </span>
-                            )}
+                            ) : null}
                             <img src={optimizeCloudinaryUrl(prod.imagen)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           </div>
                           <p className="text-sm font-heading font-bold text-slate-800 uppercase line-clamp-2 leading-snug group-hover:text-brand transition px-1.5 mt-1">
@@ -1329,16 +1513,20 @@ function App() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-5">
                     {products.map((product) => (
-                      <div key={product.id} className="kafi-card bg-white group flex flex-col">
+                      <div key={product.id} className={`kafi-card bg-white group flex flex-col ${product.stock <= 0 ? 'opacity-75' : ''}`}>
                         <div
                           className="aspect-square bg-slate-50 overflow-hidden relative cursor-pointer"
                           onClick={() => openProduct(product)}
                         >
-                          {product.badge && (
+                          {product.stock <= 0 ? (
+                            <span className="absolute top-2 left-2 z-10 bg-slate-500 text-white font-heading font-bold text-[8px] uppercase px-2 py-0.5">
+                              AGOTADO
+                            </span>
+                          ) : product.badge ? (
                             <span className="absolute top-2 left-2 z-10 bg-brand text-white font-heading font-bold text-[8px] uppercase px-2 py-0.5">
                               {product.badge}
                             </span>
-                          )}
+                          ) : null}
                           <img
                             src={optimizeCloudinaryUrl(product.imagen || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&q=80")}
                             alt={product.nombre}
@@ -1358,15 +1546,21 @@ function App() {
                             <span className="font-heading font-extrabold text-sm md:text-base text-slate-900">
                               S/ {product.precio.toFixed(2)}
                             </span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); addToCart(product, 1); }}
-                              className="bg-brand hover:bg-brand-hover text-white p-1.5 rounded transition sm:opacity-0 sm:group-hover:opacity-100"
-                              title="Agregar al carrito"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                              </svg>
-                            </button>
+                            {product.stock <= 0 ? (
+                              <span className="text-[10px] font-heading font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded">
+                                Agotado
+                              </span>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); addToCart(product, 1); }}
+                                className="bg-brand hover:bg-brand-hover text-white p-1.5 rounded transition sm:opacity-0 sm:group-hover:opacity-100"
+                                title="Agregar al carrito"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1968,6 +2162,12 @@ function App() {
               Inventario
             </button>
             <button 
+              onClick={() => { setAdminTab('pos'); fetchProducts(); }}
+              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'pos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+            >
+              Punto de Venta (POS)
+            </button>
+            <button 
               onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
               className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'pedidos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
             >
@@ -2247,9 +2447,31 @@ function App() {
                             S/ {prod.precio.toFixed(2)}
                           </td>
                           <td className="px-6 py-3.5">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-700">
-                              {prod.stock || 0}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => updateStockQuickly(prod.id, Math.max(0, (prod.stock || 0) - 1))}
+                                className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg font-bold text-xs transition"
+                              >
+                                -
+                              </button>
+                              <span className={`inline-flex items-center justify-center px-2 py-0.5 min-w-[32px] text-center rounded-full text-xs font-bold ${
+                                (prod.stock || 0) === 0
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : (prod.stock || 0) <= 5
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {prod.stock || 0}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateStockQuickly(prod.id, (prod.stock || 0) + 1)}
+                                className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg font-bold text-xs transition"
+                              >
+                                +
+                              </button>
+                            </div>
                           </td>
                           <td className="px-6 py-3.5 text-right space-x-3">
                             <button
@@ -2280,6 +2502,286 @@ function App() {
               </div>
             </div>
           </div>
+
+          ) : adminTab === 'pos' ? (
+            <div className="grid lg:grid-cols-3 gap-8">
+              {/* Left Column: Product Grid */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <h3 className="font-heading font-bold text-slate-900 text-lg">Catálogo de Productos</h3>
+                    <div className="flex flex-1 md:flex-initial items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre..."
+                        value={posSearch}
+                        onChange={(e) => setPosSearch(e.target.value)}
+                        className="flex-1 md:w-64 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-brand bg-slate-50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Category Filter Tabs */}
+                  <div className="flex gap-2 overflow-x-auto pb-3 mb-4 cat-nav-scroll">
+                    {categoriesList.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setPosCategory(cat)}
+                        className={`px-3 py-1 rounded-full text-xs font-heading font-semibold whitespace-nowrap transition ${
+                          posCategory === cat
+                            ? 'bg-brand text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* POS Products Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-1">
+                    {allProducts
+                      .filter((prod) => {
+                        const matchesCategory = posCategory === 'Todos' || prod.categoria === posCategory;
+                        const matchesSearch = prod.nombre.toLowerCase().includes(posSearch.toLowerCase());
+                        return matchesCategory && matchesSearch;
+                      })
+                      .map((prod) => {
+                        const isOutOfStock = (prod.stock || 0) <= 0;
+                        const cartItem = posCart.find(c => c.id === prod.id);
+                        const currentQtyInCart = cartItem ? cartItem.quantity : 0;
+                        const effectiveStock = Math.max(0, (prod.stock || 0) - currentQtyInCart);
+                        
+                        return (
+                          <div
+                            key={prod.id}
+                            onClick={() => { if (!isOutOfStock && effectiveStock > 0) addToPosCart(prod); }}
+                            className={`border rounded-xl p-3 flex flex-col justify-between transition h-full cursor-pointer select-none ${
+                              isOutOfStock 
+                                ? 'bg-slate-50 border-slate-200 opacity-60' 
+                                : effectiveStock === 0
+                                  ? 'bg-amber-50/50 border-amber-200 hover:border-amber-300'
+                                  : 'bg-white border-slate-200 hover:border-brand hover:shadow-sm'
+                            }`}
+                          >
+                            <div>
+                              <div className="aspect-square bg-slate-50 rounded-lg overflow-hidden relative mb-2">
+                                <img
+                                  src={optimizeCloudinaryUrl(prod.imagen || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&q=80")}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                                {isOutOfStock ? (
+                                  <span className="absolute inset-0 bg-slate-900/40 flex items-center justify-center text-white font-heading font-extrabold text-[10px] uppercase px-2 py-1">
+                                    Agotado
+                                  </span>
+                                ) : effectiveStock === 0 ? (
+                                  <span className="absolute inset-0 bg-amber-900/40 flex items-center justify-center text-white font-heading font-extrabold text-[10px] uppercase px-2 py-1">
+                                    En Carrito
+                                  </span>
+                                ) : null}
+                              </div>
+                              <h4 className="font-heading font-bold text-slate-800 text-xs line-clamp-2 leading-snug uppercase mb-1">
+                                {prod.nombre}
+                              </h4>
+                            </div>
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-slate-900 font-extrabold text-xs">
+                                  S/ {prod.precio.toFixed(2)}
+                                </span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                  isOutOfStock
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : effectiveStock <= 5
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  Stock: {effectiveStock}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: POS Cart & Checkout */}
+              <div className="lg:col-span-1 space-y-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <h3 className="font-heading font-bold text-slate-900 text-lg border-b border-slate-100 pb-3 flex justify-between items-center">
+                    <span>Detalle de Venta</span>
+                    <span className="bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full font-bold">
+                      {posCart.reduce((sum, item) => sum + item.quantity, 0)} items
+                    </span>
+                  </h3>
+
+                  {/* Cart Items List */}
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                    {posCart.map((item) => (
+                      <div key={item.id} className="flex gap-3 items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex gap-2 items-center min-w-0">
+                          <img
+                            src={optimizeCloudinaryUrl(item.imagen)}
+                            alt=""
+                            className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <h4 className="font-heading font-bold text-slate-800 text-xs truncate max-w-[120px]" title={item.nombre}>
+                              {item.nombre}
+                            </h4>
+                            <p className="text-[10px] text-slate-400">S/ {item.precio.toFixed(2)}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => updatePosCartQuantity(item.id, -1)}
+                            className="w-5 h-5 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-xs"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold text-slate-800 w-5 text-center">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => updatePosCartQuantity(item.id, 1)}
+                            className="w-5 h-5 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-xs"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeFromPosCart(item.id, item.nombre)}
+                            className="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 ml-1"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {posCart.length === 0 && (
+                      <p className="text-center py-6 text-slate-400 text-xs font-heading font-medium">
+                        Agrega productos del catálogo para iniciar.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Calculations */}
+                  <div className="bg-slate-50 p-4 rounded-xl space-y-2.5 text-xs font-semibold text-slate-600">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <span className="text-slate-800">S/ {posCart.reduce((sum, item) => sum + item.precio * item.quantity, 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Descuento (S/)</span>
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        value={posDiscount}
+                        onChange={(e) => setPosDiscount(e.target.value)}
+                        className="w-20 px-2 py-0.5 border border-slate-200 rounded text-right focus:outline-none focus:border-brand font-bold"
+                      />
+                    </div>
+                    <div className="flex justify-between border-t border-slate-200 pt-2.5 text-sm font-extrabold text-slate-900">
+                      <span>Total a Pagar</span>
+                      <span>
+                        S/ {Math.max(0, posCart.reduce((sum, item) => sum + item.precio * item.quantity, 0) - (parseFloat(posDiscount) || 0)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Checkout Form */}
+                  <form onSubmit={handlePosCheckout} className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-[10px] font-heading font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                        Nombre del Cliente (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={posClient}
+                        onChange={(e) => setPosClient(e.target.value)}
+                        placeholder="Ej. Jose Tello"
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-heading font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                        Teléfono (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={posPhone}
+                        onChange={(e) => setPosPhone(e.target.value)}
+                        placeholder="Ej. 987654321"
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-brand"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-heading font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Método de Pago
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Efectivo', 'Yape/Plin', 'Transferencia', 'Tarjeta'].map((method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => setPosPaymentMethod(method)}
+                            className={`py-1.5 rounded-lg border text-center font-heading font-bold text-xs transition ${
+                              posPaymentMethod === method
+                                ? 'bg-brand/10 border-brand text-brand'
+                                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                            }`}
+                          >
+                            {method}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Cash received calculator */}
+                    {posPaymentMethod === 'Efectivo' && (
+                      <div className="bg-sky-50/50 border border-sky-100 p-3.5 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-heading font-semibold text-sky-700 uppercase tracking-wide">
+                            Importe Recibido (S/)
+                          </label>
+                          <input
+                            type="number"
+                            required
+                            step="0.01"
+                            value={posCashReceived}
+                            onChange={(e) => setPosCashReceived(e.target.value)}
+                            placeholder="0.00"
+                            className="w-24 px-2 py-1 border border-sky-200 rounded text-right focus:outline-none focus:border-brand text-xs font-bold bg-white"
+                          />
+                        </div>
+                        <div className="flex justify-between items-center text-xs font-bold text-sky-800 border-t border-sky-100/50 pt-2">
+                          <span>Vuelto (Cambio)</span>
+                          <span className="text-sm font-extrabold text-brand-dark">
+                            S/ {Math.max(0, (parseFloat(posCashReceived) || 0) - Math.max(0, posCart.reduce((sum, item) => sum + item.precio * item.quantity, 0) - (parseFloat(posDiscount) || 0))).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={posCart.length === 0}
+                      className="w-full bg-brand hover:bg-brand-hover text-white font-heading font-bold text-sm py-2.5 rounded-lg transition shadow-md shadow-brand/10 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
+                    >
+                      Registrar Venta (Firma Venta)
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
 
           ) : adminTab === 'reclamos' ? (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -2929,6 +3431,151 @@ function App() {
             <svg className="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
           </a>
 
+        </div>
+      )}
+
+      {/* POS Voucher Receipt Modal */}
+      {posActiveVoucher && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl relative border border-slate-100 flex flex-col max-h-[90vh]">
+            <button
+              onClick={() => setPosActiveVoucher(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition"
+              title="Cerrar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Printable Area */}
+            <div id="pos-voucher-printable" className="flex-1 overflow-y-auto pr-1 py-4 text-center font-mono text-xs text-slate-800">
+              <h2 className="font-heading font-extrabold text-lg text-slate-955 tracking-tight">YUMAR IMPORTACIONES</h2>
+              <p className="text-[10px] text-slate-400 mb-2">RUC: 10967227469</p>
+              <p className="text-[9px] text-slate-400">Lima, Perú</p>
+              <p className="text-[9px] text-slate-400">WhatsApp: +51 967 227 469</p>
+              
+              <div className="border-b border-dashed border-slate-200 my-4"></div>
+
+              <div className="text-left space-y-1 text-[10px]">
+                <p><strong>TICKET:</strong> #POS-{posActiveVoucher.id}</p>
+                <p><strong>FECHA:</strong> {new Date(posActiveVoucher.fecha).toLocaleString()}</p>
+                <p><strong>CLIENTE:</strong> {posActiveVoucher.cliente}</p>
+                {posActiveVoucher.telefono && <p><strong>TELÉFONO:</strong> {posActiveVoucher.telefono}</p>}
+                <p><strong>OPERADOR:</strong> Administrador</p>
+              </div>
+
+              <div className="border-b border-dashed border-slate-200 my-4"></div>
+
+              {/* Items Table */}
+              <table className="w-full text-[10px] text-left">
+                <thead>
+                  <tr className="border-b border-slate-200 font-bold">
+                    <th className="pb-1">Cant. / Producto</th>
+                    <th className="text-right pb-1">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {posActiveVoucher.detalles.map((item) => (
+                    <tr key={item.id} className="border-b border-slate-100/50">
+                      <td className="py-1.5 pr-2">
+                        <div>{item.nombre}</div>
+                        <div className="text-[9px] text-slate-400">{item.quantity} x S/ {item.precio.toFixed(2)}</div>
+                      </td>
+                      <td className="text-right py-1.5 font-bold">S/ {(item.quantity * item.precio).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="border-b border-dashed border-slate-200 my-4"></div>
+
+              <div className="space-y-1 text-[10px]">
+                <div className="flex justify-between">
+                  <span>SUBTOTAL:</span>
+                  <span>S/ {posActiveVoucher.subtotal.toFixed(2)}</span>
+                </div>
+                {posActiveVoucher.descuento > 0 && (
+                  <div className="flex justify-between text-rose-600 font-bold">
+                    <span>DESCUENTO:</span>
+                    <span>- S/ {posActiveVoucher.descuento.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs font-extrabold text-slate-950 pt-1.5 border-t border-slate-200/50">
+                  <span>TOTAL A PAGAR:</span>
+                  <span>S/ {posActiveVoucher.total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="border-b border-dashed border-slate-200 my-4"></div>
+
+              <div className="text-left space-y-1 text-[9px] text-slate-500">
+                <p><strong>MÉTODO DE PAGO:</strong> {posActiveVoucher.metodoPago}</p>
+                {posActiveVoucher.metodoPago === 'Efectivo' && (
+                  <>
+                    <p><strong>EFECTIVO RECIBIDO:</strong> S/ {posActiveVoucher.efectivoRecibido.toFixed(2)}</p>
+                    <p><strong>CAMBIO:</strong> S/ {posActiveVoucher.cambio.toFixed(2)}</p>
+                  </>
+                )}
+              </div>
+
+              <div className="mt-6 text-center text-[10px] text-slate-400">
+                <p>¡Gracias por su compra!</p>
+                <p className="mt-1">Yumar Importaciones</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-4 flex gap-2 pt-4 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const printContents = document.getElementById('pos-voucher-printable').innerHTML;
+                  
+                  const win = window.open('', '_blank');
+                  win.document.write(`
+                    <html>
+                      <head>
+                        <title>Ticket POS</title>
+                        <style>
+                          body { font-family: monospace; padding: 20px; width: 300px; margin: 0 auto; color: #333; }
+                          table { width: 100%; border-collapse: collapse; }
+                          .text-right { text-align: right; }
+                          .border-b { border-bottom: 1px solid #ddd; }
+                          .border-b-dashed { border-bottom: 1px dashed #ccc; }
+                          .my-4 { margin: 15px 0; }
+                          .mt-6 { margin-top: 25px; }
+                          .text-center { text-align: center; }
+                          h2 { margin: 0; font-size: 16px; }
+                          p { margin: 3px 0; font-size: 11px; }
+                        </style>
+                      </head>
+                      <body>
+                        ${printContents}
+                        <script>
+                          window.onload = function() {
+                            window.print();
+                            window.close();
+                          }
+                        </script>
+                      </body>
+                    </html>
+                  `);
+                  win.document.close();
+                }}
+                className="flex-1 bg-brand hover:bg-brand-hover text-white font-heading font-bold text-xs py-2.5 rounded-lg transition text-center"
+              >
+                Imprimir Ticket
+              </button>
+              <button
+                type="button"
+                onClick={() => setPosActiveVoucher(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-heading font-bold text-xs py-2.5 rounded-lg transition text-center"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

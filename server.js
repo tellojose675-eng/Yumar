@@ -378,6 +378,32 @@ app.put('/api/productos/:id', async (req, res) => {
   }
 });
 
+// PATCH /api/productos/:id/stock - Quick update product stock
+app.patch('/api/productos/:id/stock', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { stock } = req.body;
+    
+    if (stock === undefined || isNaN(parseInt(stock))) {
+      return res.status(400).json({ error: "Stock is required and must be a number" });
+    }
+
+    const result = await pool.query(
+      "UPDATE productos SET stock = $1 WHERE id = $2 RETURNING *",
+      [parseInt(stock), id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating stock:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/productos/:id - Delete a product
 app.delete('/api/productos/:id', async (req, res) => {
   try {
@@ -465,7 +491,7 @@ app.get('/api/pedidos', async (req, res) => {
 // POST /api/pedidos
 app.post('/api/pedidos', async (req, res) => {
   try {
-    const { nombre, telefono, correo, total, detalles, metodo_entrega, metodo_pago } = req.body;
+    const { nombre, telefono, correo, total, detalles, metodo_entrega, metodo_pago, estado } = req.body;
     
     try {
       await pool.query("ALTER TABLE pedidos ADD COLUMN metodo_entrega TEXT");
@@ -475,9 +501,13 @@ app.post('/api/pedidos', async (req, res) => {
       await pool.query("ALTER TABLE pedidos ADD COLUMN metodo_pago TEXT");
     } catch (e) { /* ignore if already exists */ }
 
+    try {
+      await pool.query("ALTER TABLE pedidos ADD COLUMN estado TEXT DEFAULT 'Pendiente'");
+    } catch (e) { /* ignore if already exists */ }
+
     const result = await pool.query(
-      "INSERT INTO pedidos (nombre, telefono, correo, total, detalles, metodo_entrega, metodo_pago) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-      [nombre, telefono, correo, total, JSON.stringify(detalles), metodo_entrega || '', metodo_pago || '']
+      "INSERT INTO pedidos (nombre, telefono, correo, total, detalles, metodo_entrega, metodo_pago, estado) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+      [nombre, telefono, correo, total, JSON.stringify(detalles), metodo_entrega || '', metodo_pago || '', estado || 'Pendiente']
     );
 
     // Decrease stock

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const optimizeCloudinaryUrl = (url) => {
   if (!url || typeof url !== 'string') return url;
@@ -101,6 +101,8 @@ function App() {
   const [posSearch, setPosSearch] = useState('');
   const [posCategory, setPosCategory] = useState('Todos');
   const [posActiveVoucher, setPosActiveVoucher] = useState(null);
+
+
 
   // Cloudinary upload state
   const [imageUploading, setImageUploading] = useState(false);
@@ -3394,45 +3396,7 @@ function App() {
 
       {/* PRODUCT DETAIL MODAL - removed, now inline page view */}
 
-      {/* FLOATING WHATSAPP BUTTON con popup */}
-      {viewMode === 'shop' && (
-        <div className="fixed bottom-5 right-5 z-40 flex flex-row items-center gap-2">
 
-          {/* Burbuja de mensaje - a la izquierda del botón */}
-          <div className="relative animate-fade-in">
-            <div className="bg-white rounded-2xl rounded-br-sm shadow-xl px-4 py-3 border border-slate-100" style={{ maxWidth: '190px' }}>
-              <p className="text-sm text-slate-700 leading-snug">
-                ¿Hola, cómo <span className="font-semibold text-[#25D366]">podemos</span> ayudarte?
-              </p>
-            </div>
-            {/* Flecha apuntando a la derecha hacia el botón WhatsApp */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              right: '-8px',
-              transform: 'translateY(-50%)',
-              width: 0,
-              height: 0,
-              borderTop: '8px solid transparent',
-              borderBottom: '8px solid transparent',
-              borderLeft: '9px solid white',
-              filter: 'drop-shadow(2px 0 2px rgba(0,0,0,0.06))',
-            }} />
-          </div>
-
-          {/* Botón WhatsApp - a la derecha */}
-          <a
-            href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=Hola,%20¿cómo%20podemos%20ayudarte?`}
-            target="_blank"
-            rel="noreferrer"
-            className="w-14 h-14 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-full flex items-center justify-center shadow-lg wa-float transition-transform hover:scale-105 flex-shrink-0"
-            aria-label="WhatsApp"
-          >
-            <svg className="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
-          </a>
-
-        </div>
-      )}
 
       {/* POS Voucher Receipt Modal */}
       {posActiveVoucher && (
@@ -3579,6 +3543,9 @@ function App() {
         </div>
       )}
 
+      {/* ASISTENTE VIRTUAL IA (YumarIA) - Componente Aislado */}
+      <AiChatWidget addToCart={addToCart} />
+
       {/* FLOATING TOAST SYSTEM */}
       {toast.show && (
         <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-heading font-semibold px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-slate-800 animate-scale-up">
@@ -3586,8 +3553,278 @@ function App() {
           <span>{toast.message}</span>
         </div>
       )}
+    </div>
+  );
+}
 
+// COMPONENTE AISLADO PARA EVITAR RE-RENDERS AL ESCRIBIR EN LA IA
+function AiChatWidget({ addToCart }) {
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState([
+    {
+      sender: 'bot',
+      text: '¡Hola! 👋 Soy **YumarIA**, tu asistente de compras en Yumar Importaciones. ¿En qué te puedo ayudar hoy?'
+    }
+  ]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState(null);
+  const chatEndRef = useRef(null);
 
+  useEffect(() => {
+    if (aiChatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [aiMessages, aiLoading, aiChatOpen]);
+
+  const handleSpeak = (index, text) => {
+    if (!('speechSynthesis' in window)) return;
+    if (speakingIndex === index) {
+      window.speechSynthesis.cancel();
+      setSpeakingIndex(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*_#•📦📂💰📊📝]/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'es-ES';
+    utterance.onend = () => setSpeakingIndex(null);
+    utterance.onerror = () => setSpeakingIndex(null);
+    setSpeakingIndex(index);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleSendAiMessage = async (e, customMsg = null) => {
+    if (e) e.preventDefault();
+    const textToSend = customMsg || aiInput.trim();
+    if (!textToSend || aiLoading) return;
+
+    const newHistory = [...aiMessages, { sender: 'user', text: textToSend }];
+    setAiMessages(newHistory);
+    if (!customMsg) setAiInput('');
+    setAiLoading(true);
+
+    try {
+      const formattedHistory = newHistory.map(m => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        text: m.text
+      }));
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: textToSend,
+          history: formattedHistory.slice(-6)
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAiMessages(prev => [...prev, { sender: 'bot', text: data.reply, products: data.products }]);
+      } else {
+        setAiMessages(prev => [...prev, { sender: 'bot', text: 'Lo siento, ocurrió un inconveniente. Intenta de nuevo por favor.' }]);
+      }
+    } catch (err) {
+      setAiMessages(prev => [...prev, { sender: 'bot', text: 'No se pudo conectar con el servidor de IA.' }]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+      {/* Chat Drawer */}
+      {aiChatOpen && (
+        <div className="w-[92vw] sm:w-96 h-[460px] max-h-[calc(100vh-130px)] mb-3 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-scale-up">
+          {/* Header */}
+          <div className="shrink-0 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 p-3.5 text-white flex items-center justify-between shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-base shadow-inner">
+                🤖
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-xs sm:text-sm leading-tight flex items-center gap-1.5">
+                  YumarIA <span className="text-[9px] bg-emerald-400 text-slate-900 px-2 py-0.5 rounded-full font-bold">En Línea ⚡</span>
+                </h3>
+                <p className="text-[10px] text-white/80">Asistente de compras interactivo</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAiChatOpen(false)}
+              className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-sm transition"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Messages Body */}
+          <div className="flex-1 min-h-0 p-3.5 overflow-y-auto space-y-3 bg-slate-50 text-xs">
+            {aiMessages.map((msg, index) => (
+              <div
+                key={index}
+                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[88%] p-3 rounded-2xl relative group ${
+                    msg.sender === 'user'
+                      ? 'bg-indigo-600 text-white rounded-br-none shadow-sm'
+                      : 'bg-white text-slate-800 rounded-bl-none shadow-sm border border-slate-200/80'
+                  }`}
+                >
+                  <div className="whitespace-pre-line leading-relaxed pr-5">
+                    {msg.text.split('**').map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part))}
+                  </div>
+
+                  {/* Botón de Voz en mensajes de la IA */}
+                  {msg.sender === 'bot' && (
+                    <button
+                      type="button"
+                      onClick={() => handleSpeak(index, msg.text)}
+                      title="Escuchar respuesta"
+                      className="absolute top-2 right-2 text-slate-400 hover:text-indigo-600 transition text-xs p-1 rounded-full hover:bg-slate-100"
+                    >
+                      {speakingIndex === index ? '⏹️' : '🔊'}
+                    </button>
+                  )}
+
+                  {/* Tarjetas Interactivas de Producto en Chat */}
+                  {msg.products && msg.products.length > 0 && (
+                    <div className="mt-3 space-y-2 pt-2 border-t border-slate-100">
+                      {msg.products.map((p) => (
+                        <div key={p.id} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/90 flex items-center justify-between gap-2 shadow-xs hover:border-indigo-300 transition">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {p.imagen ? (
+                              <img src={p.imagen} alt={p.nombre} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center font-bold text-sm shrink-0">🛍️</div>
+                            )}
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-[11px] text-slate-900 truncate leading-tight">{p.nombre}</h4>
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                                <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-semibold">{p.categoria || 'General'}</span>
+                                <span className="font-bold text-slate-900">S/{parseFloat(p.precio).toFixed(2)}</span>
+                              </div>
+                              <p className="text-[9px] mt-0.5">
+                                {p.stock > 0 ? <span className="text-emerald-600 font-semibold">✅ Stock: {p.stock} unid.</span> : <span className="text-rose-500 font-semibold">❌ Agotado</span>}
+                              </p>
+                            </div>
+                          </div>
+                          {p.stock > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => addToCart(p, 1)}
+                              className="shrink-0 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] transition shadow-xs flex items-center gap-1"
+                            >
+                              🛒 Agregar
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Acceso a WhatsApp directo en bot */}
+                  {msg.sender === 'bot' && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex items-center justify-between gap-2">
+                      <a
+                        href="https://wa.me/51967227469?text=Hola%20Yumar%20Importaciones,%20quisiera%20consultar%20sobre%20sus%20productos"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold px-2.5 py-1 rounded-lg text-[10px] transition shadow-xs"
+                      >
+                        💬 Hablar por WhatsApp
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {aiLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white p-3 rounded-2xl rounded-bl-none shadow-sm border border-slate-200 flex items-center gap-2 text-slate-500">
+                  <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce"></span>
+                  <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                  <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Suggestions Chips */}
+          <div className="shrink-0 px-3 py-2 bg-white border-t border-slate-100 flex gap-1.5 overflow-x-auto text-[11px]">
+            <button
+              type="button"
+              onClick={() => handleSendAiMessage(null, "¿Qué productos me recomiendas para gamer?")}
+              className="whitespace-nowrap bg-purple-100 hover:bg-purple-200 text-purple-800 px-2.5 py-1 rounded-full border border-purple-300 font-semibold transition"
+            >
+              🎮 Gamer & Tech
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendAiMessage(null, "Muestra productos de la sección Tecnología")}
+              className="whitespace-nowrap bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-200/60 font-medium transition"
+            >
+              💻 Tecnología
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendAiMessage(null, "Ver ofertas y productos con descuento")}
+              className="whitespace-nowrap bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200/60 font-medium transition"
+            >
+              🔥 Ofertas
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendAiMessage(null, "¿Qué productos tienen en la sección Hogar?")}
+              className="whitespace-nowrap bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200/60 font-medium transition"
+            >
+              🏠 Hogar
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendAiMessage(null, "¿Cuáles son los medios de pago?")}
+              className="whitespace-nowrap bg-cyan-50 hover:bg-cyan-100 text-cyan-700 px-2.5 py-1 rounded-full border border-cyan-200/60 font-medium transition"
+            >
+              💳 Medios de Pago
+            </button>
+          </div>
+
+          {/* Input Form */}
+          <form onSubmit={handleSendAiMessage} className="shrink-0 p-2.5 bg-white border-t border-slate-200 flex gap-2">
+            <input
+              type="text"
+              placeholder="Escribe tu mensaje a YumarIA..."
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              className="flex-1 bg-slate-100 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl border border-transparent focus:border-indigo-500 focus:bg-white focus:outline-none transition"
+            />
+            <button
+              type="submit"
+              disabled={!aiInput.trim() || aiLoading}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center transition shadow-sm"
+            >
+              ➤
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Floating Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setAiChatOpen(!aiChatOpen)}
+        className="relative bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:scale-105 active:scale-95 text-white p-3.5 sm:px-4 sm:py-3 rounded-full shadow-2xl flex items-center gap-2.5 transition-all duration-300 border border-white/20 group"
+      >
+        <span className="text-xl">🤖</span>
+        <span className="hidden sm:inline font-heading font-bold text-xs">YumarIA Asistente</span>
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+        </span>
+      </button>
     </div>
   );
 }

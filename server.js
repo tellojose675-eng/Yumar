@@ -727,6 +727,154 @@ app.delete('/api/categorias/:id', async (req, res) => {
   }
 });
 
+// POST /api/chat - Asistente IA para clientes
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, history } = req.body;
+    if (!message) return res.status(400).json({ error: "El mensaje es requerido" });
+
+    // Fetch product catalog for context
+    const productsResult = await pool.query("SELECT id, nombre, precio, categoria, stock, descripcion FROM productos");
+    const catalog = productsResult.rows;
+
+    const catalogSummary = catalog.map(p => 
+      `- ID ${p.id}: "${p.nombre}" | Categoría: ${p.categoria} | Precio: S/${p.precio} | Stock: ${p.stock} unidades | Desc: ${p.descripcion}`
+    ).join('\n');
+
+    const systemPrompt = `Eres YumarIA, la asistente inteligente de la tienda virtual "Yumar Importaciones".
+Tu objetivo es ayudar amablemente a los clientes a encontrar productos, responder dudas sobre catálogo, precios, stock, envíos y pagos.
+
+DATOS EN TIEMPO REAL DE YUMAR IMPORTACIONES:
+- Ubicación / Recojo en tienda: Santa Ana, Lima.
+- Medios de Pago: Yape / Plin (al número 967227469 a nombre de Yuly Quiroz Romero) y Transferencia Bancaria.
+- Contacto WhatsApp: +51 967227469.
+- Catálogo actual:
+${catalogSummary}
+
+REGLAS DE RESPUESTA:
+1. Responde de forma cordial, clara y directa en español con emoticonos.
+2. Cuando el cliente pregunte por un producto o categoría, DEBES mostrar detalladamente:
+   • 📦 **Producto:** Nombre exacto
+   • 📂 **Sección / Categoría:** Nombre de la categoría
+   • 💰 **Precio:** S/ Precio
+   • 📊 **Stock:** Cantidad disponible (ej: "15 unidades disponibles" o "Agotado")
+   • 📝 **Descripción:** Breve resumen
+3. Respuestas concisas de máximo 2 o 3 párrafos.`;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    let matchedProducts = [];
+
+    // Local matching for products with smart intent keywords
+    const lowerMsg = message.toLowerCase();
+    
+    const isGamerQuery = lowerMsg.includes('gamer') || lowerMsg.includes('juego') || lowerMsg.includes('juegos') || lowerMsg.includes('audifono') || lowerMsg.includes('mouse') || lowerMsg.includes('teclado') || lowerMsg.includes('gaming');
+    const isTechQuery = isGamerQuery || lowerMsg.includes('tecnologia') || lowerMsg.includes('tech') || lowerMsg.includes('electronico') || lowerMsg.includes('cable') || lowerMsg.includes('cargador') || lowerMsg.includes('celular') || lowerMsg.includes('luz');
+    const isHogarQuery = lowerMsg.includes('hogar') || lowerMsg.includes('casa') || lowerMsg.includes('cocina') || lowerMsg.includes('limpieza') || lowerMsg.includes('foco');
+    const isBellezaQuery = lowerMsg.includes('belleza') || lowerMsg.includes('cuidado') || lowerMsg.includes('maquillaje') || lowerMsg.includes('facial');
+    const isDeporteQuery = lowerMsg.includes('deporte') || lowerMsg.includes('deportes') || lowerMsg.includes('fitness') || lowerMsg.includes('ejercicio');
+    const isJugueteQuery = lowerMsg.includes('juguete') || lowerMsg.includes('juguetes') || lowerMsg.includes('nino') || lowerMsg.includes('niño');
+
+    matchedProducts = catalog.filter(p => {
+      const pName = p.nombre ? p.nombre.toLowerCase() : '';
+      const pCat = p.categoria ? p.categoria.toLowerCase() : '';
+      const pDesc = p.descripcion ? p.descripcion.toLowerCase() : '';
+
+      if (pName && lowerMsg.includes(pName)) return true;
+      if (pCat && lowerMsg.includes(pCat)) return true;
+      if (pDesc && lowerMsg.includes(pDesc)) return true;
+
+      if (isGamerQuery && (pCat.includes('tecnología') || pCat.includes('tecnologia') || pName.includes('audifono') || pName.includes('mouse') || pName.includes('interruptor') || pName.includes('tomacorriente') || pName.includes('gamer') || pDesc.includes('gamer') || pDesc.includes('led'))) return true;
+      if (isTechQuery && (pCat.includes('tecnología') || pCat.includes('tecnologia'))) return true;
+      if (isHogarQuery && pCat.includes('hogar')) return true;
+      if (isBellezaQuery && pCat.includes('belleza')) return true;
+      if (isDeporteQuery && pCat.includes('deporte')) return true;
+      if (isJugueteQuery && pCat.includes('juguete')) return true;
+
+      return false;
+    });
+
+    // Si busca recomendación general o gamer y no hay filtro específico, mostrar productos con stock
+    if (matchedProducts.length === 0 && (isGamerQuery || isTechQuery || lowerMsg.includes('recomiend') || lowerMsg.includes('suger') || lowerMsg.includes('que comprar') || lowerMsg.includes('destacado'))) {
+      matchedProducts = catalog.filter(p => p.stock > 0);
+    }
+
+    if (apiKey) {
+      try {
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { role: 'user', parts: [{ text: systemPrompt }] },
+              { role: 'model', parts: [{ text: '¡Entendido! Mostraré siempre la sección, precio y stock de cada producto.' }] },
+              ...(history || []).map(h => ({
+                role: h.role === 'user' ? 'user' : 'model',
+                parts: [{ text: h.text }]
+              })),
+              { role: 'user', parts: [{ text: message }] }
+            ]
+          })
+        });
+
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json();
+          const replyText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (replyText) {
+            return res.json({ reply: replyText, products: matchedProducts.slice(0, 3) });
+          }
+        }
+      } catch (err) {
+        console.error("Error al consultar Gemini API:", err);
+      }
+    }
+
+    // Smart Local Fallback Engine
+    let reply = "";
+
+    if (lowerMsg.includes('hola') || lowerMsg.includes('buenas') || lowerMsg.includes('saludos')) {
+      reply = `¡Hola! 👋 Bienvenido a **Yumar Importaciones**. Soy YumarIA, tu asistente virtual. ¿En qué te puedo ayudar hoy? Puedo buscar productos por categoría, informarte sobre su precio, stock actual, envíos o medios de pago.`;
+    } else if (lowerMsg.includes('pago') || lowerMsg.includes('yape') || lowerMsg.includes('plin') || lowerMsg.includes('tarjeta') || lowerMsg.includes('banco')) {
+      reply = `En **Yumar Importaciones** aceptamos los siguientes métodos de pago:\n\n📱 **Yape / Plin:** 967227469 (Titular: Yuly Quiroz Romero)\n🏦 **Transferencia Bancaria**\n\n¿Deseas ayuda con algún producto?`;
+    } else if (lowerMsg.includes('envio') || lowerMsg.includes('entrega') || lowerMsg.includes('donde') || lowerMsg.includes('tienda') || lowerMsg.includes('recojo') || lowerMsg.includes('ubica')) {
+      reply = `📍 **Punto de Recojo:** Nuestra sede principal está en **Santa Ana**.\n\nTambién realizamos envíos y coordinaciones por WhatsApp al **+51 967227469**.`;
+    } else if (matchedProducts.length > 0) {
+      const topProds = matchedProducts.slice(0, 3);
+      reply = (isGamerQuery ? `🎮 **Recomendaciones Gamer & Tecnología en Yumar Importaciones:**\n\n` : `¡Claro! Aquí tienes los productos disponibles en nuestro catálogo:\n\n`) +
+        topProds.map(p => 
+          `📦 **Producto:** ${p.nombre}\n` +
+          `📂 **Sección:** ${p.categoria || 'General'}\n` +
+          `💰 **Precio:** S/${parseFloat(p.precio).toFixed(2)}\n` +
+          `📊 **Stock:** ${p.stock > 0 ? `✅ Disponible (${p.stock} unid.)` : '❌ Agotado'}\n` +
+          `📝 **Detalle:** ${p.descripcion || 'Producto importado de alta calidad.'}`
+        ).join('\n\n---\n\n') +
+        `\n\n¿Te gustaría agregar alguno a tu carrito de compras?`;
+    } else if (lowerMsg.includes('oferta') || lowerMsg.includes('descuento') || lowerMsg.includes('recomend') || lowerMsg.includes('mas vendido') || lowerMsg.includes('catalogo')) {
+      const inStock = catalog.filter(p => p.stock > 0).slice(0, 3);
+      reply = `🔥 **Productos destacados con stock en Yumar Importaciones:**\n\n` +
+        inStock.map(p => 
+          `📦 **${p.nombre}**\n` +
+          `📂 **Sección:** ${p.categoria}\n` +
+          `💰 **Precio:** S/${parseFloat(p.precio).toFixed(2)}\n` +
+          `📊 **Stock:** ✅ ${p.stock} disponibles`
+        ).join('\n\n---\n\n') +
+        `\n\n¿Te gustaría más detalles de alguno?`;
+    } else {
+      const defaultProds = catalog.filter(p => p.stock > 0).slice(0, 2);
+      matchedProducts = defaultProds;
+      reply = `Gracias por tu consulta. En **Yumar Importaciones** tenemos excelentes productos en **Tecnología**, **Hogar**, **Belleza** y más.\n\nAquí tienes un par de opciones con stock en tienda:\n\n` +
+        defaultProds.map(p => `• **${p.nombre}** (S/${parseFloat(p.precio).toFixed(2)}) - ${p.categoria}`).join('\n') +
+        `\n\n¡O escríbeme qué tipo de producto buscas y te daré su precio exacto!`;
+    }
+
+    res.json({ reply, products: matchedProducts.slice(0, 3) });
+
+  } catch (err) {
+    console.error('Error en /api/chat:', err);
+    res.status(500).json({ error: "Error procesando la consulta de IA." });
+  }
+});
+
 // Catch-all route for SPA (Single Page Application) - only in production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {

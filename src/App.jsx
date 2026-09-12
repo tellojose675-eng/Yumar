@@ -2217,10 +2217,11 @@ function App() {
                 setIsAdminAuthenticated(false); 
                 localStorage.setItem('yumar_viewMode', 'shop');
                 localStorage.setItem('yumar_adminAuth', 'false');
+                if (window.location.hash) history.replaceState(null, '', window.location.pathname);
               }}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-heading font-bold text-xs md:text-sm px-4 py-2.5 rounded-lg transition"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-heading font-bold text-xs md:text-sm px-4 py-2.5 rounded-xl transition shadow-md shadow-rose-600/20 flex items-center gap-1.5"
             >
-              Cerrar Sesión
+              🚪 Cerrar Sesión
             </button>
           </div>
 

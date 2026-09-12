@@ -881,7 +881,13 @@ function App() {
   };
 
   const deletePedido = async (id) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar este pedido?")) return;
+    const password = prompt("🔒 Confirmación de Seguridad:\nIngrese la contraseña de administrador para eliminar este pedido:");
+    if (password === null) return;
+    if (password !== 'admin123') {
+      showToast("❌ Contraseña incorrecta. No se pudo eliminar el pedido.");
+      return;
+    }
+    if (!confirm("⚠️ ¿Estás seguro de que deseas eliminar este pedido?")) return;
     try {
       const res = await fetch(`/api/pedidos/${id}`, {
         method: 'DELETE'
@@ -898,6 +904,12 @@ function App() {
   };
 
   const clearPedidosHistory = async () => {
+    const password = prompt("🔒 Confirmación de Seguridad:\nIngrese la contraseña de administrador para vaciar TODO el historial de pedidos:");
+    if (password === null) return;
+    if (password !== 'admin123') {
+      showToast("❌ Contraseña incorrecta. No se vació el historial.");
+      return;
+    }
     if (!confirm("⚠️ ¿Estás absolutamente seguro de que deseas vaciar TODO el historial de pedidos? Esta acción no se puede deshacer.")) return;
     try {
       const res = await fetch('/api/pedidos', {

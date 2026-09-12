@@ -3969,8 +3969,8 @@ function AiChatWidget({ addToCart }) {
           {/* Header */}
           <div className="shrink-0 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 p-3.5 text-white flex items-center justify-between shadow-md">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-base shadow-inner">
-                🤖
+              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center overflow-hidden shadow-inner">
+                <img src="/mascota-yumar.png" alt="YumarIA" className="w-7 h-7 object-contain" />
               </div>
               <div>
                 <h3 className="font-heading font-bold text-xs sm:text-sm leading-tight flex items-center gap-1.5">
@@ -4141,19 +4141,43 @@ function AiChatWidget({ addToCart }) {
         </div>
       )}
 
-      {/* Floating Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setAiChatOpen(!aiChatOpen)}
-        className="relative bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:scale-105 active:scale-95 text-white p-3.5 sm:px-4 sm:py-3 rounded-full shadow-2xl flex items-center gap-2.5 transition-all duration-300 border border-white/20 group"
-      >
-        <span className="text-xl">🤖</span>
-        <span className="hidden sm:inline font-heading font-bold text-xs">YumarIA Asistente</span>
-        <span className="relative flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-        </span>
-      </button>
+      {/* Floating Trigger Button - Mascota */}
+      {!aiChatOpen && (
+        <div className="animate-bounce-slow flex flex-col items-end gap-1">
+          <div className="bg-white text-slate-800 text-xs font-heading font-bold px-3 py-2 rounded-xl shadow-lg border border-slate-200 relative whitespace-nowrap">
+            ¡Hola! 👋 ¿En qué puedo ayudarte?
+            <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-white border-r border-b border-slate-200 transform rotate-45"></div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAiChatOpen(true)}
+            className="relative hover:scale-110 active:scale-95 transition-all duration-300 group"
+          >
+            <img
+              src="/mascota-yumar.png"
+              alt="Asistente Yumar"
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-xl"
+            />
+            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
+            </span>
+          </button>
+        </div>
+      )}
+      {aiChatOpen && (
+        <button
+          type="button"
+          onClick={() => setAiChatOpen(false)}
+          className="relative hover:scale-110 active:scale-95 transition-all duration-300"
+        >
+          <img
+            src="/mascota-yumar.png"
+            alt="Asistente Yumar"
+            className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-xl opacity-80"
+          />
+        </button>
+      )}
     </div>
   );
 }

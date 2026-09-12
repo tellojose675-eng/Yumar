@@ -2172,50 +2172,73 @@ function App() {
             </button>
           </div>
 
-          <div className="flex gap-4 mb-6 border-b border-slate-200 overflow-x-auto cat-nav-scroll">
-            <button 
-              onClick={() => { setAdminTab('analitica'); fetchAnalytics(); }}
-              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 flex items-center gap-1.5 ${adminTab === 'analitica' ? 'text-indigo-600 border-indigo-600 font-extrabold' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
-            >
-              📊 Big Data / Analítica
-            </button>
-            <button 
-              onClick={() => setAdminTab('productos')}
-              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'productos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
-            >
-              Inventario
-            </button>
-            <button 
-              onClick={() => { setAdminTab('pos'); fetchProducts(); }}
-              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'pos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
-            >
-              Punto de Venta (POS)
-            </button>
-            <button 
-              onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
-              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'pedidos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
-            >
-              Pedidos
-            </button>
-            <button 
-              onClick={() => { setAdminTab('reclamos'); fetchReclamosList(); }}
-              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'reclamos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
-            >
-              Reclamos
-            </button>
-            <button 
-              onClick={() => { setAdminTab('resenas'); fetchAdminResenas(); }}
-              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'resenas' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
-            >
-              Reseñas
-            </button>
-            <button 
-              onClick={() => { setAdminTab('categorias'); fetchCategorias(); }}
-              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'categorias' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
-            >
-              Categorías
-            </button>
-          </div>
+          {/* Vertical Layout Container */}
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Left Vertical Navigation Menu */}
+            <aside className="w-full lg:w-64 shrink-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm h-fit space-y-1">
+              <p className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider px-3 pb-2 border-b border-slate-100 mb-2">
+                Menú de Administración
+              </p>
+
+              <button 
+                type="button"
+                onClick={() => { setAdminTab('analitica'); fetchAnalytics(); }}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'analitica' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-base">📊</span> Big Data / Analítica
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => setAdminTab('productos')}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'productos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-base">📦</span> Inventario
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => { setAdminTab('pos'); fetchProducts(); }}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'pos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-base">🏪</span> Punto de Venta (POS)
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'pedidos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-base">🛒</span> Pedidos / Ventas
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => { setAdminTab('reclamos'); fetchReclamosList(); }}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'reclamos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-base">📢</span> Reclamos
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => { setAdminTab('resenas'); fetchAdminResenas(); }}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'resenas' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-base">⭐</span> Reseñas
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => { setAdminTab('categorias'); fetchCategorias(); }}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'categorias' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-base">🏷️</span> Categorías
+              </button>
+            </aside>
+
+            {/* Right Main Content Area */}
+            <div className="flex-1 min-w-0">
 
           {adminTab === 'productos' ? (
             <div className="grid lg:grid-cols-3 gap-8">
@@ -3311,7 +3334,7 @@ function App() {
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </main>
       )}
 

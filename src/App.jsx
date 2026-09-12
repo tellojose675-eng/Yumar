@@ -4156,7 +4156,7 @@ function AiChatWidget({ addToCart }) {
             <img
               src="/mascota-yumar.png"
               alt="Asistente Yumar"
-              className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-xl"
+              className="w-28 h-28 sm:w-32 sm:h-32 object-contain drop-shadow-xl"
             />
             <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -4174,7 +4174,7 @@ function AiChatWidget({ addToCart }) {
           <img
             src="/mascota-yumar.png"
             alt="Asistente Yumar"
-            className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-xl opacity-80"
+            className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-xl"
           />
         </button>
       )}

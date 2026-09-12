@@ -3773,7 +3773,7 @@ function App() {
             {/* Printable Area */}
             <div id="pos-voucher-printable" className="flex-1 overflow-y-auto pr-1 py-4 text-center font-mono text-xs text-slate-800">
               <h2 className="font-heading font-extrabold text-lg text-slate-955 tracking-tight">YUMAR IMPORTACIONES</h2>
-              <p className="text-[10px] text-slate-400 mb-2">RUC: 10967227469</p>
+              <p className="text-[10px] text-slate-400 mb-2">RUC: 20614188465</p>
               <p className="text-[9px] text-slate-400">Lima, Perú</p>
               <p className="text-[9px] text-slate-400">WhatsApp: +51 967 227 469</p>
               
@@ -3784,7 +3784,6 @@ function App() {
                 <p><strong>FECHA:</strong> {new Date(posActiveVoucher.fecha).toLocaleString()}</p>
                 <p><strong>CLIENTE:</strong> {posActiveVoucher.cliente}</p>
                 {posActiveVoucher.telefono && <p><strong>TELÉFONO:</strong> {posActiveVoucher.telefono}</p>}
-                <p><strong>OPERADOR:</strong> Administrador</p>
               </div>
 
               <div className="border-b border-dashed border-slate-200 my-4"></div>

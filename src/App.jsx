@@ -3119,8 +3119,8 @@ function App() {
               </div>
             </div>
           ) : (
-            /* ANALITICA / BIG DATA DASHBOARD */
             <div className="space-y-6">
+              {/* ANALITICA / BIG DATA DASHBOARD */}
               {/* Header Banner */}
               <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-6 rounded-2xl shadow-lg border border-indigo-500/20">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3188,7 +3188,7 @@ function App() {
                     <span className="p-2 bg-amber-50 text-amber-600 rounded-lg text-lg">⭐</span>
                   </div>
                   <p className="text-xl md:text-2xl font-extrabold text-slate-900">
-                    {analyticsData?.kpis?.calificacionPromedio || '0.0'} / 5.0
+                    {`${analyticsData?.kpis?.calificacionPromedio || '0.0'} / 5.0`}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1">{analyticsData?.kpis?.totalReclamos || 0} reclamo(s) registrados</p>
                 </div>
@@ -3273,7 +3273,7 @@ function App() {
                       {analyticsData.ventasPorMetodoPago.map((m, idx) => (
                         <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
                           <div>
-                            <p className="text-xs font-bold text-slate-800 capitalize">{m.metodo.replace('_', ' / ')}</p>
+                            <p className="text-xs font-bold text-slate-800 capitalize">{m.metodo ? m.metodo.replace('_', ' - ') : 'Efectivo'}</p>
                             <p className="text-[10px] text-slate-500">{m.cantidad} transacción(es)</p>
                           </div>
                           <span className="text-xs font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">
@@ -3312,7 +3312,7 @@ function App() {
                             <td className="p-2 font-mono text-[10px] text-slate-500">{new Date(p.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</td>
                             <td className="p-2 font-medium text-slate-800">{p.nombre}</td>
                             <td className="p-2 font-bold text-slate-900">S/ {parseFloat(p.total).toFixed(2)}</td>
-                            <td className="p-2 capitalize text-slate-600">{p.metodo_pago?.replace('_', ' ') || 'Efectivo'}</td>
+                            <td className="p-2 capitalize text-slate-600">{p.metodo_pago ? p.metodo_pago.replace('_', ' ') : 'Efectivo'}</td>
                             <td className="p-2">
                               <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                                 p.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' :
@@ -3334,9 +3334,12 @@ function App() {
                 </div>
               </div>
             </div>
-          </div>
-        </main>
-      )}
+          )}
+        </div>
+      </div>
+    </main>
+  )}
+
 
       {/* Trust Badges - estilo Kafi */}
       {viewMode === 'shop' && (

@@ -178,6 +178,30 @@ function App() {
     localStorage.setItem('yumar_adminTab', adminTab);
   }, [adminTab]);
 
+  // URL Hash Routing: mantiene la pestaña fija al recargar (ej. #analitica, #pos, #pedidos)
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = (window.location.hash || '').replace('#', '');
+      if (['admin', 'analitica', 'pos', 'pedidos', 'productos', 'reclamos', 'resenas', 'categorias'].includes(hash)) {
+        setViewMode('admin');
+        if (hash !== 'admin') setAdminTab(hash);
+      } else if (hash === 'reclamaciones') {
+        setViewMode('reclamaciones');
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === 'admin' && isAdminAuthenticated) {
+      if (window.location.hash !== `#${adminTab}`) {
+        window.history.replaceState(null, '', `#${adminTab}`);
+      }
+    }
+  }, [viewMode, adminTab, isAdminAuthenticated]);
+
 
   // Fetch products from API on filter change
   const fetchProducts = async (cat = currentCategory, search = appliedSearch) => {

@@ -1214,27 +1214,7 @@ function App() {
       )}
       </div>
 
-      {/* Promo Banner - estilo tienda Kafi */}
-      {viewMode === 'shop' && !selectedProduct && (
-        <section className="bg-gradient-to-r from-brand/5 via-pink-50 to-brand/5 border-b border-pink-100">
-          <div className="w-full px-4 py-3 md:py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-            <div>
-              <p className="text-xs font-heading font-bold text-brand uppercase tracking-widest">Importaciones directas</p>
-              <p className="text-sm md:text-base font-heading font-semibold text-slate-800 mt-0.5">
-                Envíos a todo el Perú · Productos con garantía
-              </p>
-            </div>
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=Hola,%20quiero%20información%20sobre%20sus%20productos%20importados.`}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-brand hover:bg-brand-hover text-white text-xs font-heading font-bold px-5 py-2.5 rounded transition whitespace-nowrap"
-            >
-              Consultar por WhatsApp
-            </a>
-          </div>
-        </section>
-      )}
+
 
       {viewMode === 'shop' ? (
         <main className="flex-1 flex flex-col">

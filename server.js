@@ -875,6 +875,164 @@ REGLAS DE RESPUESTA:
   }
 });
 
+// GET /api/analytics - Dashboard de Analítica / Big Data
+app.get('/api/analytics', async (req, res) => {
+  try {
+    // --- KPIs Generales ---
+    const ventasResult = await pool.query(
+      "SELECT COALESCE(SUM(total), 0) as total_ventas, COUNT(*) as total_pedidos FROM pedidos WHERE estado != 'Cancelado'"
+    );
+    const pendientesResult = await pool.query(
+      "SELECT COUNT(*) as count FROM pedidos WHERE estado = 'Pendiente'"
+    );
+    const productosResult = await pool.query(
+      "SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE stock <= 0) as agotados FROM productos"
+    );
+    const reclamosResult = await pool.query(
+      "SELECT COUNT(*) as total FROM reclamos"
+    );
+    const calificacionResult = await pool.query(
+      "SELECT COALESCE(AVG(calificacion), 0) as promedio FROM resenas WHERE aprobado = true"
+    );
+
+    const totalVentas = parseFloat(ventasResult.rows[0].total_ventas);
+    const totalPedidos = parseInt(ventasResult.rows[0].total_pedidos);
+    const ticketPromedio = totalPedidos > 0 ? totalVentas / totalPedidos : 0;
+
+    const kpis = {
+      totalVentas,
+      totalPedidos,
+      pedidosPendientes: parseInt(pendientesResult.rows[0].count),
+      ticketPromedio: Math.round(ticketPromedio * 100) / 100,
+      totalProductos: parseInt(productosResult.rows[0].total),
+      productosAgotados: parseInt(productosResult.rows[0].agotados),
+      totalReclamos: parseInt(reclamosResult.rows[0].total),
+      calificacionPromedio: Math.round(parseFloat(calificacionResult.rows[0].promedio) * 10) / 10
+    };
+
+    // --- Ventas por Día (últimos 30 días) ---
+    const ventasPorDiaResult = await pool.query(`
+      SELECT 
+        DATE(fecha) as fecha,
+        COALESCE(SUM(total), 0) as total,
+        COUNT(*) as cantidad
+      FROM pedidos 
+      WHERE estado != 'Cancelado' 
+        AND fecha >= NOW() - INTERVAL '30 days'
+      GROUP BY DATE(fecha)
+      ORDER BY fecha ASC
+    `);
+
+    // --- Ventas por Categoría ---
+    const ventasPorCategoriaResult = await pool.query(`
+      SELECT 
+        p.categoria,
+        COALESCE(SUM(ped.total), 0) as total,
+        COUNT(ped.id) as cantidad
+      FROM pedidos ped
+      CROSS JOIN LATERAL jsonb_array_elements(
+        CASE 
+          WHEN jsonb_typeof(ped.detalles) = 'array' THEN ped.detalles
+          ELSE '[]'::jsonb
+        END
+      ) AS item
+      JOIN productos p ON p.id = (item->>'id')::int
+      WHERE ped.estado != 'Cancelado'
+      GROUP BY p.categoria
+      ORDER BY total DESC
+    `);
+
+    // Fallback: si no hay datos de join, usar conteo simple por categoría de productos
+    let ventasPorCategoria = ventasPorCategoriaResult.rows;
+    if (ventasPorCategoria.length === 0) {
+      const fallbackCat = await pool.query(`
+        SELECT categoria, COUNT(*) as cantidad, COALESCE(SUM(precio * stock), 0) as total
+        FROM productos
+        GROUP BY categoria
+        ORDER BY total DESC
+      `);
+      ventasPorCategoria = fallbackCat.rows;
+    }
+
+    // --- Top 5 Productos Más Vendidos ---
+    let topProductos = [];
+    try {
+      const topResult = await pool.query(`
+        SELECT 
+          p.nombre,
+          p.imagen,
+          p.categoria,
+          COALESCE(SUM((item->>'quantity')::int), 0) as cantidad_vendida,
+          COALESCE(SUM((item->>'quantity')::int * p.precio), 0) as ingreso_total
+        FROM pedidos ped
+        CROSS JOIN LATERAL jsonb_array_elements(
+          CASE 
+            WHEN jsonb_typeof(ped.detalles) = 'array' THEN ped.detalles
+            ELSE '[]'::jsonb
+          END
+        ) AS item
+        JOIN productos p ON p.id = (item->>'id')::int
+        WHERE ped.estado != 'Cancelado'
+        GROUP BY p.id, p.nombre, p.imagen, p.categoria
+        ORDER BY cantidad_vendida DESC
+        LIMIT 5
+      `);
+      topProductos = topResult.rows;
+    } catch (e) {
+      // Si falla el parsing de detalles, devolver vacío
+      console.error('Error parsing top products:', e.message);
+    }
+
+    // --- Ventas por Método de Pago ---
+    let ventasPorMetodoPago = [];
+    try {
+      const metodoPagoResult = await pool.query(`
+        SELECT 
+          COALESCE(metodo_pago, 'No especificado') as metodo,
+          COALESCE(SUM(total), 0) as total,
+          COUNT(*) as cantidad
+        FROM pedidos
+        WHERE estado != 'Cancelado'
+        GROUP BY metodo_pago
+        ORDER BY total DESC
+      `);
+      ventasPorMetodoPago = metodoPagoResult.rows;
+    } catch (e) { /* ignore */ }
+
+    // --- Reclamos por Estado ---
+    const reclamosPorEstadoResult = await pool.query(`
+      SELECT 
+        COALESCE(estado, 'Pendiente') as estado,
+        COUNT(*) as cantidad
+      FROM reclamos
+      GROUP BY estado
+      ORDER BY cantidad DESC
+    `);
+
+    // --- Pedidos recientes (últimos 10) ---
+    const pedidosRecientesResult = await pool.query(`
+      SELECT id, nombre, total, estado, metodo_pago, fecha
+      FROM pedidos
+      ORDER BY fecha DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      kpis,
+      ventasPorDia: ventasPorDiaResult.rows,
+      ventasPorCategoria,
+      topProductos,
+      ventasPorMetodoPago,
+      reclamosPorEstado: reclamosPorEstadoResult.rows,
+      pedidosRecientes: pedidosRecientesResult.rows
+    });
+
+  } catch (err) {
+    console.error('Error en /api/analytics:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Catch-all route for SPA (Single Page Application) - only in production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {

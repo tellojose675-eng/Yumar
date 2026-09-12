@@ -59,6 +59,8 @@ function App() {
   const [reclamosList, setReclamosList] = useState([]);
   const [pedidosList, setPedidosList] = useState([]);
   const [resenasList, setResenasList] = useState([]);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // Login State
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -254,6 +256,15 @@ function App() {
         }
       }
     } catch { /* ignore */ }
+  };
+
+  const fetchAnalytics = async () => {
+    setAnalyticsLoading(true);
+    try {
+      const res = await fetch('/api/analytics');
+      if (res.ok) setAnalyticsData(await res.json());
+    } catch { /* ignore */ }
+    finally { setAnalyticsLoading(false); }
   };
 
   useEffect(() => {
@@ -2158,6 +2169,12 @@ function App() {
 
           <div className="flex gap-4 mb-6 border-b border-slate-200 overflow-x-auto cat-nav-scroll">
             <button 
+              onClick={() => { setAdminTab('analitica'); fetchAnalytics(); }}
+              className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 flex items-center gap-1.5 ${adminTab === 'analitica' ? 'text-indigo-600 border-indigo-600 font-extrabold' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+            >
+              📊 Big Data / Analítica
+            </button>
+            <button 
               onClick={() => setAdminTab('productos')}
               className={`pb-3 whitespace-nowrap font-heading font-bold text-sm transition-colors border-b-2 ${adminTab === 'productos' ? 'text-brand border-brand' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
             >
@@ -2980,7 +2997,7 @@ function App() {
                 </table>
               </div>
             </div>
-          ) : (
+          ) : adminTab === 'resenas' ? (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className="font-heading font-bold text-slate-900">Control de Reseñas</h3>
@@ -3039,6 +3056,220 @@ function App() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          ) : (
+            /* ANALITICA / BIG DATA DASHBOARD */
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-6 rounded-2xl shadow-lg border border-indigo-500/20">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <span className="inline-block bg-indigo-500/20 text-indigo-300 font-mono text-xs px-2.5 py-1 rounded-md border border-indigo-400/30 mb-2 font-bold">
+                      ⚡ Big Data & Business Intelligence Dashboard
+                    </span>
+                    <h2 className="text-xl md:text-2xl font-heading font-extrabold tracking-tight">
+                      Análisis de Datos Masivos e Indicadores de Negocio
+                    </h2>
+                    <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+                      Procesamiento de datos en tiempo real sobre transacciones, catálogo, comportamiento de compra y nivel de satisfacción de clientes.
+                    </p>
+                  </div>
+                  <button
+                    onClick={fetchAnalytics}
+                    disabled={analyticsLoading}
+                    className="self-start md:self-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-md shadow-indigo-600/30 shrink-0"
+                  >
+                    {analyticsLoading ? '⏳ Cargando...' : '🔄 Actualizar Métricas'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Metric Cards Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-xs hover:border-indigo-300 transition">
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-xs font-heading font-bold uppercase tracking-wider">Ingresos Totales</span>
+                    <span className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-lg">💰</span>
+                  </div>
+                  <p className="text-xl md:text-2xl font-extrabold text-slate-900">
+                    S/ {analyticsData?.kpis?.totalVentas?.toFixed(2) || '0.00'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">Acumulado ventas confirmadas</p>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-xs hover:border-indigo-300 transition">
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-xs font-heading font-bold uppercase tracking-wider">Total Pedidos</span>
+                    <span className="p-2 bg-indigo-50 text-indigo-600 rounded-lg text-lg">📦</span>
+                  </div>
+                  <p className="text-xl md:text-2xl font-extrabold text-slate-900">
+                    {analyticsData?.kpis?.totalPedidos || 0}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1 text-[11px]">
+                    <span className="text-amber-600 font-bold">⏳ {analyticsData?.kpis?.pedidosPendientes || 0} pendientes</span>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-xs hover:border-indigo-300 transition">
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-xs font-heading font-bold uppercase tracking-wider">Ticket Promedio</span>
+                    <span className="p-2 bg-purple-50 text-purple-600 rounded-lg text-lg">🎟️</span>
+                  </div>
+                  <p className="text-xl md:text-2xl font-extrabold text-slate-900">
+                    S/ {analyticsData?.kpis?.ticketPromedio?.toFixed(2) || '0.00'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">Gasto medio por cliente</p>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-xs hover:border-indigo-300 transition">
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-xs font-heading font-bold uppercase tracking-wider">Satisfacción Cliente</span>
+                    <span className="p-2 bg-amber-50 text-amber-600 rounded-lg text-lg">⭐</span>
+                  </div>
+                  <p className="text-xl md:text-2xl font-extrabold text-slate-900">
+                    {analyticsData?.kpis?.calificacionPromedio || '0.0'} / 5.0
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">{analyticsData?.kpis?.totalReclamos || 0} reclamo(s) registrados</p>
+                </div>
+              </div>
+
+              {/* Section 2: Detailed Charts & Distributions */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Sales by Category */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
+                  <h3 className="font-heading font-bold text-slate-900 text-base mb-4 flex items-center justify-between">
+                    <span>🏷️ Distribución por Categorías</span>
+                    <span className="text-xs font-normal text-slate-500">Agregación Big Data</span>
+                  </h3>
+                  {analyticsData?.ventasPorCategoria?.length > 0 ? (
+                    <div className="space-y-4">
+                      {analyticsData.ventasPorCategoria.map((cat, i) => {
+                        const maxTotal = Math.max(...analyticsData.ventasPorCategoria.map(c => parseFloat(c.total) || 1));
+                        const pct = Math.round(((parseFloat(cat.total) || 0) / maxTotal) * 100);
+                        return (
+                          <div key={i} className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-semibold text-slate-700">
+                              <span>{cat.categoria || 'Sin Categoría'}</span>
+                              <span className="font-bold text-slate-900">S/ {parseFloat(cat.total || 0).toFixed(2)} ({cat.cantidad} unids)</span>
+                            </div>
+                            <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-500"
+                                style={{ width: `${Math.max(8, pct)}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 py-8 text-center">Sin suficiente historial para clasificar por categorías.</p>
+                  )}
+                </div>
+
+                {/* Top Selling Products */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
+                  <h3 className="font-heading font-bold text-slate-900 text-base mb-4 flex items-center justify-between">
+                    <span>🔥 Top Productos Más Vendidos</span>
+                    <span className="text-xs font-normal text-slate-500">Ranking Algorítmico</span>
+                  </h3>
+                  {analyticsData?.topProductos?.length > 0 ? (
+                    <div className="divide-y divide-slate-100">
+                      {analyticsData.topProductos.map((prod, idx) => (
+                        <div key={idx} className="py-3 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0">
+                              #{idx + 1}
+                            </span>
+                            {prod.imagen && (
+                              <img src={prod.imagen} alt="" className="w-9 h-9 object-cover rounded-lg border border-slate-200 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">{prod.nombre}</p>
+                              <p className="text-[10px] text-slate-500">{prod.categoria}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="block text-xs font-extrabold text-slate-900">{prod.cantidad_vendida} vendid.</span>
+                            <span className="text-[10px] text-emerald-600 font-semibold">S/ {parseFloat(prod.ingreso_total || 0).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 py-8 text-center">Registra ventas para ver los productos líderes.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 3: Payment Methods & Recent Log */}
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Payment methods */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs lg:col-span-1">
+                  <h3 className="font-heading font-bold text-slate-900 text-base mb-4">💳 Métodos de Pago</h3>
+                  {analyticsData?.ventasPorMetodoPago?.length > 0 ? (
+                    <div className="space-y-3">
+                      {analyticsData.ventasPorMetodoPago.map((m, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-slate-800 capitalize">{m.metodo.replace('_', ' / ')}</p>
+                            <p className="text-[10px] text-slate-500">{m.cantidad} transacción(es)</p>
+                          </div>
+                          <span className="text-xs font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">
+                            S/ {parseFloat(m.total || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 py-6 text-center">Sin transacciones procesadas.</p>
+                  )}
+                </div>
+
+                {/* Real-time Order Stream */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs lg:col-span-2">
+                  <h3 className="font-heading font-bold text-slate-900 text-base mb-4 flex items-center justify-between">
+                    <span>⚡ Flujo Reciente de Datos (Pedidos)</span>
+                    <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">En Vivo</span>
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 font-bold uppercase text-[9px]">
+                          <th className="p-2">ID</th>
+                          <th className="p-2">Cliente</th>
+                          <th className="p-2">Monto</th>
+                          <th className="p-2">Pago</th>
+                          <th className="p-2">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {analyticsData?.pedidosRecientes?.map((p) => (
+                          <tr key={p.id} className="hover:bg-slate-50/50">
+                            <td className="p-2 font-mono text-slate-400">#{p.id}</td>
+                            <td className="p-2 font-medium text-slate-800">{p.nombre}</td>
+                            <td className="p-2 font-bold text-slate-900">S/ {parseFloat(p.total).toFixed(2)}</td>
+                            <td className="p-2 capitalize text-slate-600">{p.metodo_pago?.replace('_', ' ') || 'Efectivo'}</td>
+                            <td className="p-2">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                p.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' :
+                                p.estado === 'Cancelado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {p.estado || 'Pendiente'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {(!analyticsData?.pedidosRecientes || analyticsData.pedidosRecientes.length === 0) && (
+                          <tr>
+                            <td colSpan={5} className="p-4 text-center text-slate-400">Sin datos de pedidos recientes.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           )}

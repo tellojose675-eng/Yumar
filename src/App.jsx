@@ -3902,7 +3902,7 @@ function App() {
       )}
 
       {/* ASISTENTE VIRTUAL IA (YumarIA) - Componente Aislado */}
-      <AiChatWidget addToCart={addToCart} cartOpen={cartOpen} />
+      <AiChatWidget addToCart={addToCart} cartOpen={cartOpen} viewMode={viewMode} />
 
       {/* FLOATING TOAST SYSTEM */}
       {toast.show && (
@@ -3916,7 +3916,7 @@ function App() {
 }
 
 // COMPONENTE AISLADO PARA EVITAR RE-RENDERS AL ESCRIBIR EN LA IA
-function AiChatWidget({ addToCart, cartOpen }) {
+function AiChatWidget({ addToCart, cartOpen, viewMode }) {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([
     {
@@ -3990,7 +3990,7 @@ function AiChatWidget({ addToCart, cartOpen }) {
     }
   };
 
-  if (cartOpen) return null;
+  if (cartOpen || viewMode === 'admin') return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">

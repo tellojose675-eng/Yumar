@@ -987,7 +987,7 @@ function App() {
 
   const webPedidosList = pedidosList.filter(p => !p.metodo_entrega || !p.metodo_entrega.toLowerCase().includes('pos'));
   const webPedidosCount = webPedidosList.length;
-  const webPedidosPendientesCount = webPedidosList.filter(p => p.estado === 'Pendiente').length;
+  const webPedidosPendientesCount = webPedidosList.filter(p => !p.estado || p.estado === 'Pendiente').length;
 
   const bestsellers = allProducts
     .filter(p => p.badge?.includes('VENDIDO') || p.badge?.includes('POPULAR'))
@@ -2196,13 +2196,13 @@ function App() {
             <div>
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl md:text-3xl font-heading font-extrabold text-slate-900">Panel de Control</h1>
-                {webPedidosCount > 0 && (
-                  <span className="bg-emerald-50 text-emerald-700 text-xs font-heading font-extrabold px-3 py-1 rounded-full border border-emerald-200/80 flex items-center gap-1.5 shadow-2xs">
+                {webPedidosPendientesCount > 0 && (
+                  <span className="bg-rose-600 text-white text-xs font-heading font-black px-3 py-1 rounded-full border border-rose-700 flex items-center gap-1.5 shadow-md shadow-rose-600/30 animate-pulse">
                     <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                     </span>
-                    🌐 {webPedidosCount} Pedidos Web {webPedidosPendientesCount > 0 ? `(${webPedidosPendientesCount} nuevos)` : ''}
+                    🚨 {webPedidosPendientesCount} {webPedidosPendientesCount === 1 ? 'NUEVA SOLICITUD WEB' : 'NUEVAS SOLICITUDES WEB'}
                   </span>
                 )}
               </div>
@@ -2263,16 +2263,14 @@ function App() {
                   <span className="text-base">🛒</span>
                   <span>Pedidos / Ventas</span>
                 </div>
-                {webPedidosCount > 0 ? (
-                  <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded-full font-black tracking-tight transition flex items-center gap-1 shrink-0 ${
+                {webPedidosPendientesCount > 0 && (
+                  <span className={`text-[10px] md:text-xs px-2.5 py-0.5 rounded-full font-black tracking-tight transition flex items-center gap-1 shrink-0 ${
                     adminTab === 'pedidos' 
-                      ? 'bg-white text-indigo-700 shadow-2xs' 
-                      : 'bg-emerald-500 text-white shadow-2xs animate-pulse'
+                      ? 'bg-rose-500 text-white shadow-xs' 
+                      : 'bg-rose-600 text-white shadow-md shadow-rose-600/40 animate-pulse'
                   }`}>
-                    🌐 {webPedidosCount} Web
+                    🚨 {webPedidosPendientesCount} {webPedidosPendientesCount === 1 ? 'Nuevo' : 'Nuevos'}
                   </span>
-                ) : (
-                  <span className="text-[10px] text-slate-400 font-medium">0 Web</span>
                 )}
               </button>
 

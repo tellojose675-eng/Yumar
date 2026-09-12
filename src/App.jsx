@@ -26,7 +26,9 @@ function App() {
   
   // Modals & Views
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [viewMode, setViewMode] = useState('shop'); // 'shop', 'admin' or 'reclamaciones'
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('yumar_viewMode') || 'shop';
+  });
   const [detailQuantity, setDetailQuantity] = useState(1);
 
   // Reclamaciones Form State
@@ -55,7 +57,9 @@ function App() {
     badge: 'NUEVO INGRESO',
     stock: 0
   });
-  const [adminTab, setAdminTab] = useState('productos');
+  const [adminTab, setAdminTab] = useState(() => {
+    return localStorage.getItem('yumar_adminTab') || 'analitica';
+  });
   const [reclamosList, setReclamosList] = useState([]);
   const [pedidosList, setPedidosList] = useState([]);
   const [resenasList, setResenasList] = useState([]);
@@ -63,8 +67,11 @@ function App() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // Login State
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    return localStorage.getItem('yumar_adminAuth') === 'true';
+  });
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+
 
   // Checkout State
   const [checkoutForm, setCheckoutForm] = useState({ 
@@ -154,10 +161,23 @@ function App() {
   const YAPE_NUMBER = "967227469";
   const YAPE_NAME = "Yuly Quiroz Romero";
 
-  // Save cart to local storage
+  // Save cart & admin state to local storage
   useEffect(() => {
     localStorage.setItem('yumar_cart', JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem('yumar_viewMode', viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    localStorage.setItem('yumar_adminAuth', isAdminAuthenticated ? 'true' : 'false');
+  }, [isAdminAuthenticated]);
+
+  useEffect(() => {
+    localStorage.setItem('yumar_adminTab', adminTab);
+  }, [adminTab]);
+
 
   // Fetch products from API on filter change
   const fetchProducts = async (cat = currentCategory, search = appliedSearch) => {
@@ -801,6 +821,9 @@ function App() {
     e.preventDefault();
     if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
       setIsAdminAuthenticated(true);
+      setViewMode('admin');
+      localStorage.setItem('yumar_adminAuth', 'true');
+      localStorage.setItem('yumar_viewMode', 'admin');
       showToast("Bienvenido al Panel de Control");
     } else {
       showToast("Credenciales incorrectas");
@@ -2165,7 +2188,12 @@ function App() {
               <p className="text-sm text-slate-500">Administra inventario, pedidos, reclamos y reseñas.</p>
             </div>
             <button 
-              onClick={() => { setViewMode('shop'); setIsAdminAuthenticated(false); }}
+              onClick={() => { 
+                setViewMode('shop'); 
+                setIsAdminAuthenticated(false); 
+                localStorage.setItem('yumar_viewMode', 'shop');
+                localStorage.setItem('yumar_adminAuth', 'false');
+              }}
               className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-heading font-bold text-xs md:text-sm px-4 py-2.5 rounded-lg transition"
             >
               Cerrar Sesión

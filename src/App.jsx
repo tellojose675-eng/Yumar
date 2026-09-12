@@ -89,9 +89,10 @@ function App() {
   // Toast Alert State
   const [toast, setToast] = useState({ show: false, message: '' });
 
-  // Admin Search State
+  // Admin Search & Filter State
   const [adminProductSearch, setAdminProductSearch] = useState('');
   const [adminOrderSearch, setAdminOrderSearch] = useState('');
+  const [orderSourceFilter, setOrderSourceFilter] = useState('todos'); // 'todos', 'web', 'pos'
 
   // POS (Point of Sale) State
   const [posCart, setPosCart] = useState([]);
@@ -670,7 +671,7 @@ function App() {
           detalles: posCart,
           metodo_entrega: metodoEntregaStr,
           metodo_pago: posPaymentMethod,
-          estado: 'Completado'
+          estado: 'Entregado'
         })
       });
 
@@ -926,6 +927,10 @@ function App() {
   });
 
   const filteredPedidos = pedidosList.filter(p => {
+    const isPos = p.metodo_entrega && p.metodo_entrega.toLowerCase().includes('pos');
+    if (orderSourceFilter === 'web' && isPos) return false;
+    if (orderSourceFilter === 'pos' && !isPos) return false;
+
     if (!adminOrderSearch) return true;
     const term = adminOrderSearch.toLowerCase();
     return p.nombre.toLowerCase().includes(term) || (p.telefono && p.telefono.toLowerCase().includes(term)) || (p.estado && p.estado.toLowerCase().includes(term));
@@ -2933,22 +2938,52 @@ function App() {
             </div>
           ) : adminTab === 'pedidos' ? (
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h3 className="font-heading font-bold text-slate-900">Historial de Pedidos</h3>
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                  <input type="text" placeholder="Buscar cliente, teléfono o estado..." value={adminOrderSearch} onChange={(e) => setAdminOrderSearch(e.target.value)} className="flex-1 md:w-64 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-brand bg-slate-50" />
-                  <button onClick={exportOrdersCSV} className="text-xs font-heading font-bold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-100 flex items-center gap-1 transition">⬇️ Exportar CSV</button>
-                  <button onClick={() => fetchPedidosList()} className="text-xs font-heading font-semibold text-slate-500 hover:text-brand shrink-0">Actualizar</button>
-                  <button onClick={clearPedidosHistory} className="text-xs font-heading font-bold bg-rose-50 text-rose-600 px-3 py-1.5 rounded hover:bg-rose-100 flex items-center gap-1 transition">🗑️ Vaciar historial</button>
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-heading font-bold text-slate-900 text-lg">Historial de Ventas</h3>
+                    <p className="text-xs text-slate-500">Consulta los pedidos filtrados por canal de venta (Web o POS).</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <input type="text" placeholder="Buscar cliente, teléfono o estado..." value={adminOrderSearch} onChange={(e) => setAdminOrderSearch(e.target.value)} className="flex-1 md:w-64 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-brand bg-slate-50" />
+                    <button onClick={exportOrdersCSV} className="text-xs font-heading font-bold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-100 flex items-center gap-1 transition">⬇️ Exportar CSV</button>
+                    <button onClick={() => fetchPedidosList()} className="text-xs font-heading font-semibold text-slate-500 hover:text-brand shrink-0">Actualizar</button>
+                    <button onClick={clearPedidosHistory} className="text-xs font-heading font-bold bg-rose-50 text-rose-600 px-3 py-1.5 rounded hover:bg-rose-100 flex items-center gap-1 transition">🗑️ Vaciar historial</button>
+                  </div>
+                </div>
+
+                {/* Sub-Tabs: Historial Tienda Web vs POS */}
+                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                  <button 
+                    type="button"
+                    onClick={() => setOrderSourceFilter('todos')} 
+                    className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1.5 ${orderSourceFilter === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    📋 Todos ({pedidosList.length})
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setOrderSourceFilter('web')} 
+                    className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1.5 ${orderSourceFilter === 'web' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    🌐 Ventas Tienda Web ({pedidosList.filter(p => !p.metodo_entrega || !p.metodo_entrega.toLowerCase().includes('pos')).length})
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setOrderSourceFilter('pos')} 
+                    className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1.5 ${orderSourceFilter === 'pos' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    🏪 Ventas POS (Punto de Venta) ({pedidosList.filter(p => p.metodo_entrega && p.metodo_entrega.toLowerCase().includes('pos')).length})
+                  </button>
                 </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
-                      <th className="px-6 py-3">Fecha</th>
+                      <th className="px-6 py-3">Fecha y Hora</th>
                       <th className="px-6 py-3">Cliente</th>
-                      <th className="px-6 py-3">Entrega</th>
+                      <th className="px-6 py-3">Canal / Entrega</th>
                       <th className="px-6 py-3">Monto</th>
                       <th className="px-6 py-3">Detalle</th>
                       <th className="px-6 py-3">Estado</th>
@@ -2958,7 +2993,9 @@ function App() {
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredPedidos.map((ped) => (
                       <tr key={ped.id} className="hover:bg-slate-50/50 transition-colors align-top">
-                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">{new Date(ped.fecha).toLocaleDateString()}</td>
+                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-600 font-mono">
+                          {new Date(ped.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                        </td>
                         <td className="px-6 py-3.5">
                           <p className="font-medium text-slate-800">{ped.nombre}</p>
                           <p className="text-xs text-slate-500">📱 {ped.telefono}</p>
@@ -3238,6 +3275,7 @@ function App() {
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 font-bold uppercase text-[9px]">
                           <th className="p-2">ID</th>
+                          <th className="p-2">Fecha y Hora</th>
                           <th className="p-2">Cliente</th>
                           <th className="p-2">Monto</th>
                           <th className="p-2">Pago</th>
@@ -3248,6 +3286,7 @@ function App() {
                         {analyticsData?.pedidosRecientes?.map((p) => (
                           <tr key={p.id} className="hover:bg-slate-50/50">
                             <td className="p-2 font-mono text-slate-400">#{p.id}</td>
+                            <td className="p-2 font-mono text-[10px] text-slate-500">{new Date(p.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</td>
                             <td className="p-2 font-medium text-slate-800">{p.nombre}</td>
                             <td className="p-2 font-bold text-slate-900">S/ {parseFloat(p.total).toFixed(2)}</td>
                             <td className="p-2 capitalize text-slate-600">{p.metodo_pago?.replace('_', ' ') || 'Efectivo'}</td>

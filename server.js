@@ -878,153 +878,138 @@ REGLAS DE RESPUESTA:
 // GET /api/analytics - Dashboard de Analítica / Big Data
 app.get('/api/analytics', async (req, res) => {
   try {
-    // --- KPIs Generales ---
-    const ventasResult = await pool.query(
-      "SELECT COALESCE(SUM(total), 0) as total_ventas, COUNT(*) as total_pedidos FROM pedidos WHERE estado != 'Cancelado'"
-    );
-    const pendientesResult = await pool.query(
-      "SELECT COUNT(*) as count FROM pedidos WHERE estado = 'Pendiente'"
-    );
-    const productosResult = await pool.query(
-      "SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE stock <= 0) as agotados FROM productos"
-    );
-    const reclamosResult = await pool.query(
-      "SELECT COUNT(*) as total FROM reclamos"
-    );
-    const calificacionResult = await pool.query(
-      "SELECT COALESCE(AVG(calificacion), 0) as promedio FROM resenas WHERE aprobado = true"
-    );
+    const [
+      pedidosRes,
+      productosRes,
+      reclamosRes,
+      resenasRes
+    ] = await Promise.all([
+      pool.query("SELECT * FROM pedidos ORDER BY fecha DESC"),
+      pool.query("SELECT * FROM productos"),
+      pool.query("SELECT * FROM reclamos"),
+      pool.query("SELECT * FROM resenas WHERE aprobado = true")
+    ]);
 
-    const totalVentas = parseFloat(ventasResult.rows[0].total_ventas);
-    const totalPedidos = parseInt(ventasResult.rows[0].total_pedidos);
+    const pedidos = pedidosRes.rows || [];
+    const productos = productosRes.rows || [];
+    const reclamos = reclamosRes.rows || [];
+    const resenas = resenasRes.rows || [];
+
+    const pedidosValidos = pedidos.filter(p => p.estado !== 'Cancelado');
+
+    const totalVentas = pedidosValidos.reduce((sum, p) => sum + (parseFloat(p.total) || 0), 0);
+    const totalPedidos = pedidosValidos.length;
+    const pedidosPendientes = pedidos.filter(p => p.estado === 'Pendiente').length;
     const ticketPromedio = totalPedidos > 0 ? totalVentas / totalPedidos : 0;
+    const totalProductos = productos.length;
+    const productosAgotados = productos.filter(p => (p.stock || 0) <= 0).length;
+    const totalReclamos = reclamos.length;
+    const avgCalificacion = resenas.length > 0 
+      ? resenas.reduce((sum, r) => sum + (parseInt(r.calificacion) || 0), 0) / resenas.length 
+      : 0;
 
     const kpis = {
-      totalVentas,
+      totalVentas: Math.round(totalVentas * 100) / 100,
       totalPedidos,
-      pedidosPendientes: parseInt(pendientesResult.rows[0].count),
+      pedidosPendientes,
       ticketPromedio: Math.round(ticketPromedio * 100) / 100,
-      totalProductos: parseInt(productosResult.rows[0].total),
-      productosAgotados: parseInt(productosResult.rows[0].agotados),
-      totalReclamos: parseInt(reclamosResult.rows[0].total),
-      calificacionPromedio: Math.round(parseFloat(calificacionResult.rows[0].promedio) * 10) / 10
+      totalProductos,
+      productosAgotados,
+      totalReclamos,
+      calificacionPromedio: Math.round(avgCalificacion * 10) / 10
     };
 
-    // --- Ventas por Día (últimos 30 días) ---
-    const ventasPorDiaResult = await pool.query(`
-      SELECT 
-        DATE(fecha) as fecha,
-        COALESCE(SUM(total), 0) as total,
-        COUNT(*) as cantidad
-      FROM pedidos 
-      WHERE estado != 'Cancelado' 
-        AND fecha >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(fecha)
-      ORDER BY fecha ASC
-    `);
+    // Aggregate Sales by Category & Top Products in JS (100% safe)
+    const catMap = {};
+    const prodMap = {};
+    const metodoMap = {};
 
-    // --- Ventas por Categoría ---
-    const ventasPorCategoriaResult = await pool.query(`
-      SELECT 
-        p.categoria,
-        COALESCE(SUM(ped.total), 0) as total,
-        COUNT(ped.id) as cantidad
-      FROM pedidos ped
-      CROSS JOIN LATERAL jsonb_array_elements(
-        CASE 
-          WHEN jsonb_typeof(ped.detalles) = 'array' THEN ped.detalles
-          ELSE '[]'::jsonb
-        END
-      ) AS item
-      JOIN productos p ON p.id = (item->>'id')::int
-      WHERE ped.estado != 'Cancelado'
-      GROUP BY p.categoria
-      ORDER BY total DESC
-    `);
+    pedidosValidos.forEach(p => {
+      // Método de pago
+      const metodo = p.metodo_pago || 'No especificado';
+      metodoMap[metodo] = (metodoMap[metodo] || { total: 0, cantidad: 0 });
+      metodoMap[metodo].total += parseFloat(p.total) || 0;
+      metodoMap[metodo].cantidad += 1;
 
-    // Fallback: si no hay datos de join, usar conteo simple por categoría de productos
-    let ventasPorCategoria = ventasPorCategoriaResult.rows;
+      // Detalles
+      let items = [];
+      if (typeof p.detalles === 'string') {
+        try { items = JSON.parse(p.detalles); } catch (e) { items = []; }
+      } else if (Array.isArray(p.detalles)) {
+        items = p.detalles;
+      }
+
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          const qty = parseInt(item.quantity) || 1;
+          const price = parseFloat(item.precio) || 0;
+          const prodId = item.id;
+          const prodObj = productos.find(pr => pr.id === prodId) || item;
+          const cat = prodObj.categoria || 'General';
+          const name = prodObj.nombre || item.nombre || 'Producto';
+          const img = prodObj.imagen || item.imagen || '';
+
+          // Categoria
+          catMap[cat] = (catMap[cat] || { total: 0, cantidad: 0 });
+          catMap[cat].total += price * qty;
+          catMap[cat].cantidad += qty;
+
+          // Top productos
+          const key = prodId ? `id_${prodId}` : name;
+          if (!prodMap[key]) {
+            prodMap[key] = { nombre: name, imagen: img, categoria: cat, cantidad_vendida: 0, ingreso_total: 0 };
+          }
+          prodMap[key].cantidad_vendida += qty;
+          prodMap[key].ingreso_total += price * qty;
+        });
+      }
+    });
+
+    // Fallback categorias si no hay compras aún
+    let ventasPorCategoria = Object.entries(catMap).map(([categoria, d]) => ({
+      categoria,
+      total: Math.round(d.total * 100) / 100,
+      cantidad: d.cantidad
+    })).sort((a, b) => b.total - a.total);
+
     if (ventasPorCategoria.length === 0) {
-      const fallbackCat = await pool.query(`
-        SELECT categoria, COUNT(*) as cantidad, COALESCE(SUM(precio * stock), 0) as total
-        FROM productos
-        GROUP BY categoria
-        ORDER BY total DESC
-      `);
-      ventasPorCategoria = fallbackCat.rows;
+      const fallbackCat = {};
+      productos.forEach(p => {
+        const cat = p.categoria || 'General';
+        fallbackCat[cat] = (fallbackCat[cat] || 0) + 1;
+      });
+      ventasPorCategoria = Object.entries(fallbackCat).map(([categoria, cantidad]) => ({
+        categoria,
+        total: 0,
+        cantidad
+      }));
     }
 
-    // --- Top 5 Productos Más Vendidos ---
-    let topProductos = [];
-    try {
-      const topResult = await pool.query(`
-        SELECT 
-          p.nombre,
-          p.imagen,
-          p.categoria,
-          COALESCE(SUM((item->>'quantity')::int), 0) as cantidad_vendida,
-          COALESCE(SUM((item->>'quantity')::int * p.precio), 0) as ingreso_total
-        FROM pedidos ped
-        CROSS JOIN LATERAL jsonb_array_elements(
-          CASE 
-            WHEN jsonb_typeof(ped.detalles) = 'array' THEN ped.detalles
-            ELSE '[]'::jsonb
-          END
-        ) AS item
-        JOIN productos p ON p.id = (item->>'id')::int
-        WHERE ped.estado != 'Cancelado'
-        GROUP BY p.id, p.nombre, p.imagen, p.categoria
-        ORDER BY cantidad_vendida DESC
-        LIMIT 5
-      `);
-      topProductos = topResult.rows;
-    } catch (e) {
-      // Si falla el parsing de detalles, devolver vacío
-      console.error('Error parsing top products:', e.message);
-    }
+    const topProductos = Object.values(prodMap)
+      .sort((a, b) => b.cantidad_vendida - a.cantidad_vendida)
+      .slice(0, 5);
 
-    // --- Ventas por Método de Pago ---
-    let ventasPorMetodoPago = [];
-    try {
-      const metodoPagoResult = await pool.query(`
-        SELECT 
-          COALESCE(metodo_pago, 'No especificado') as metodo,
-          COALESCE(SUM(total), 0) as total,
-          COUNT(*) as cantidad
-        FROM pedidos
-        WHERE estado != 'Cancelado'
-        GROUP BY metodo_pago
-        ORDER BY total DESC
-      `);
-      ventasPorMetodoPago = metodoPagoResult.rows;
-    } catch (e) { /* ignore */ }
+    const ventasPorMetodoPago = Object.entries(metodoMap).map(([metodo, d]) => ({
+      metodo,
+      total: Math.round(d.total * 100) / 100,
+      cantidad: d.cantidad
+    })).sort((a, b) => b.total - a.total);
 
-    // --- Reclamos por Estado ---
-    const reclamosPorEstadoResult = await pool.query(`
-      SELECT 
-        COALESCE(estado, 'Pendiente') as estado,
-        COUNT(*) as cantidad
-      FROM reclamos
-      GROUP BY estado
-      ORDER BY cantidad DESC
-    `);
-
-    // --- Pedidos recientes (últimos 10) ---
-    const pedidosRecientesResult = await pool.query(`
-      SELECT id, nombre, total, estado, metodo_pago, fecha
-      FROM pedidos
-      ORDER BY fecha DESC
-      LIMIT 10
-    `);
+    const pedidosRecientes = pedidos.slice(0, 10).map(p => ({
+      id: p.id,
+      nombre: p.nombre,
+      total: parseFloat(p.total) || 0,
+      estado: p.estado || 'Pendiente',
+      metodo_pago: p.metodo_pago,
+      fecha: p.fecha
+    }));
 
     res.json({
       kpis,
-      ventasPorDia: ventasPorDiaResult.rows,
       ventasPorCategoria,
       topProductos,
       ventasPorMetodoPago,
-      reclamosPorEstado: reclamosPorEstadoResult.rows,
-      pedidosRecientes: pedidosRecientesResult.rows
+      pedidosRecientes
     });
 
   } catch (err) {
@@ -1032,6 +1017,7 @@ app.get('/api/analytics', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Catch-all route for SPA (Single Page Application) - only in production
 if (process.env.NODE_ENV === 'production') {

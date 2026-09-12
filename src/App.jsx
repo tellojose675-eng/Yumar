@@ -4144,9 +4144,9 @@ function AiChatWidget({ addToCart }) {
       {/* Floating Trigger Button - Mascota */}
       {!aiChatOpen && (
         <div className="animate-bounce-slow flex flex-col items-end gap-1">
-          <div className="bg-white text-slate-800 text-xs font-heading font-bold px-3 py-2 rounded-xl shadow-lg border border-slate-200 relative whitespace-nowrap">
+          <div className="bg-white text-slate-800 text-sm sm:text-base font-heading font-bold px-4 py-3 rounded-2xl shadow-lg border border-slate-200 relative whitespace-nowrap">
             ¡Hola! 👋 ¿En qué puedo ayudarte?
-            <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-white border-r border-b border-slate-200 transform rotate-45"></div>
+            <div className="absolute -bottom-2 right-8 w-4 h-4 bg-white border-r border-b border-slate-200 transform rotate-45"></div>
           </div>
           <button
             type="button"

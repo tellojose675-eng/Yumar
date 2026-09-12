@@ -338,15 +338,16 @@ function App() {
     }
   }, [viewMode, isAdminAuthenticated, adminTab]);
 
-  // Admin panel: refresca la pestaña activa cada 15 segundos
+  // Admin panel: refresca los pedidos continuamente para el contador en tiempo real en el menú
   useEffect(() => {
     if (viewMode !== 'admin' || !isAdminAuthenticated) return;
+    fetchPedidosList(); // Carga inicial al entrar al panel de administración
     const interval = setInterval(() => {
+      fetchPedidosList(); // Siempre refresca pedidos para mantener actualizado el contador del menú
       if (adminTab === 'productos') { fetchProducts(); fetchAllProducts(); }
       if (adminTab === 'reclamos') fetchReclamosList();
-      if (adminTab === 'pedidos') fetchPedidosList();
       if (adminTab === 'resenas') fetchAdminResenas();
-    }, 15000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [viewMode, isAdminAuthenticated, adminTab]);
 
@@ -462,9 +463,10 @@ function App() {
       setCartOpen(false);
       setViewMode('voucher');
       
-      // Refresh inventory so stock updates locally
+      // Refresh inventory & orders so stock and admin order count update locally
       fetchProducts();
       fetchAllProducts();
+      fetchPedidosList();
       
       // Update local state instantly so UI is responsive
       const updateStockLocally = (productList) => productList.map(p => {
@@ -982,6 +984,10 @@ function App() {
     const term = adminOrderSearch.toLowerCase();
     return p.nombre.toLowerCase().includes(term) || (p.telefono && p.telefono.toLowerCase().includes(term)) || (p.estado && p.estado.toLowerCase().includes(term));
   });
+
+  const webPedidosList = pedidosList.filter(p => !p.metodo_entrega || !p.metodo_entrega.toLowerCase().includes('pos'));
+  const webPedidosCount = webPedidosList.length;
+  const webPedidosPendientesCount = webPedidosList.filter(p => p.estado === 'Pendiente').length;
 
   const bestsellers = allProducts
     .filter(p => p.badge?.includes('VENDIDO') || p.badge?.includes('POPULAR'))
@@ -2188,7 +2194,18 @@ function App() {
         <main className="w-full px-4 py-10 flex-1">
           <div className="flex items-center justify-between mb-8 border-b border-slate-200 pb-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-heading font-extrabold text-slate-900">Panel de Control</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl md:text-3xl font-heading font-extrabold text-slate-900">Panel de Control</h1>
+                {webPedidosCount > 0 && (
+                  <span className="bg-emerald-50 text-emerald-700 text-xs font-heading font-extrabold px-3 py-1 rounded-full border border-emerald-200/80 flex items-center gap-1.5 shadow-2xs">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    🌐 {webPedidosCount} Pedidos Web {webPedidosPendientesCount > 0 ? `(${webPedidosPendientesCount} nuevos)` : ''}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-slate-500">Administra inventario, pedidos, reclamos y reseñas.</p>
             </div>
             <button 
@@ -2240,9 +2257,23 @@ function App() {
               <button 
                 type="button"
                 onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'pedidos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center justify-between gap-2 ${adminTab === 'pedidos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
               >
-                <span className="text-base">🛒</span> Pedidos / Ventas
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">🛒</span>
+                  <span>Pedidos / Ventas</span>
+                </div>
+                {webPedidosCount > 0 ? (
+                  <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded-full font-black tracking-tight transition flex items-center gap-1 shrink-0 ${
+                    adminTab === 'pedidos' 
+                      ? 'bg-white text-indigo-700 shadow-2xs' 
+                      : 'bg-emerald-500 text-white shadow-2xs animate-pulse'
+                  }`}>
+                    🌐 {webPedidosCount} Web
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-medium">0 Web</span>
+                )}
               </button>
 
               <button 

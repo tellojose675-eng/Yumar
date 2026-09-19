@@ -37,6 +37,28 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// Health Check Endpoint (Cloud Infrastructure Readiness)
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbResult = await pool.query('SELECT 1 AS healthy');
+    res.status(200).json({
+      status: 'UP',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: dbResult.rows.length > 0 ? 'CONNECTED' : 'DISCONNECTED',
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'DEGRADED',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'DISCONNECTED',
+      error: err.message
+    });
+  }
+});
+
 // Serve static files from the dist directory (for production)
 app.use(express.static(join(__dirname, 'dist')));
 

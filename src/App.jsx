@@ -3079,31 +3079,6 @@ function App() {
                       </div>
                     </div>
 
-                    {/* Cash received calculator */}
-                    {posPaymentMethod === 'Efectivo' && (
-                      <div className="bg-sky-50/50 border border-sky-100 p-3.5 rounded-xl space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-[10px] font-heading font-semibold text-sky-700 uppercase tracking-wide">
-                            Importe Recibido (S/)
-                          </label>
-                          <input
-                            type="number"
-                            required
-                            step="0.01"
-                            value={posCashReceived}
-                            onChange={(e) => setPosCashReceived(e.target.value)}
-                            placeholder="0.00"
-                            className="w-24 px-2 py-1 border border-sky-200 rounded text-right focus:outline-none focus:border-brand text-xs font-bold bg-white"
-                          />
-                        </div>
-                        <div className="flex justify-between items-center text-xs font-bold text-sky-800 border-t border-sky-100/50 pt-2">
-                          <span>Vuelto (Cambio)</span>
-                          <span className="text-sm font-extrabold text-brand-dark">
-                            S/ {Math.max(0, (parseFloat(posCashReceived) || 0) - Math.max(0, posCart.reduce((sum, item) => sum + item.precio * item.quantity, 0) - (parseFloat(posDiscount) || 0))).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
 
                     <button
                       type="submit"
@@ -4187,7 +4162,7 @@ function App() {
 
               <div className="text-left space-y-1 text-[9px] text-slate-500">
                 <p><strong>MÉTODO DE PAGO:</strong> {posActiveVoucher.metodoPago}</p>
-                {posActiveVoucher.metodoPago === 'Efectivo' && (
+                {posActiveVoucher.metodoPago === 'Efectivo' && posActiveVoucher.efectivoRecibido > 0 && (
                   <>
                     <p><strong>EFECTIVO RECIBIDO:</strong> S/ {posActiveVoucher.efectivoRecibido.toFixed(2)}</p>
                     <p><strong>CAMBIO:</strong> S/ {posActiveVoucher.cambio.toFixed(2)}</p>

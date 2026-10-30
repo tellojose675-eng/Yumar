@@ -2203,22 +2203,23 @@ function App() {
         </main>
       ) : (
         // BACKEND / ADMIN VIEW
-        <main className="w-full px-4 py-10 flex-1">
-          <div className="flex items-center justify-between mb-8 border-b border-slate-200 pb-4">
+        <main className="w-full px-3 sm:px-4 py-6 sm:py-10 flex-1">
+          {/* Admin Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 border-b border-slate-200 pb-4">
             <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl md:text-3xl font-heading font-extrabold text-slate-900">Panel de Control</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-heading font-extrabold text-slate-900">Panel de Control</h1>
                 {webPedidosPendientesCount > 0 && (
-                  <span className="bg-rose-600 text-white text-xs font-heading font-black px-3 py-1 rounded-full border border-rose-700 flex items-center gap-1.5 shadow-md shadow-rose-600/30 animate-pulse">
+                  <span className="bg-rose-600 text-white text-[10px] sm:text-xs font-heading font-black px-2.5 py-1 rounded-full border border-rose-700 flex items-center gap-1.5 shadow-md shadow-rose-600/30 animate-pulse">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                     </span>
-                    🚨 {webPedidosPendientesCount} {webPedidosPendientesCount === 1 ? 'NUEVA SOLICITUD WEB' : 'NUEVAS SOLICITUDES WEB'}
+                    🚨 {webPedidosPendientesCount} {webPedidosPendientesCount === 1 ? 'Nueva solicitud' : 'Nuevas solicitudes'}
                   </span>
                 )}
               </div>
-              <p className="text-sm text-slate-500">Administra inventario, pedidos, reclamos y reseñas.</p>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Administra inventario, pedidos, reclamos y reseñas.</p>
             </div>
             <button 
               onClick={() => { 
@@ -2228,97 +2229,132 @@ function App() {
                 localStorage.setItem('yumar_adminAuth', 'false');
                 if (window.location.hash) history.replaceState(null, '', window.location.pathname);
               }}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-heading font-bold text-xs md:text-sm px-4 py-2.5 rounded-xl transition shadow-md shadow-rose-600/20 flex items-center gap-1.5"
+              className="self-start sm:self-auto bg-rose-600 hover:bg-rose-700 text-white font-heading font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl transition shadow-md shadow-rose-600/20 flex items-center gap-1.5"
             >
               🚪 Cerrar Sesión
             </button>
           </div>
 
-          {/* Vertical Layout Container */}
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left Vertical Navigation Menu */}
-            <aside className="w-full lg:w-64 shrink-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm h-fit space-y-1">
-              <p className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider px-3 pb-2 border-b border-slate-100 mb-2">
-                Menú de Administración
-              </p>
-
-              <button 
-                type="button"
-                onClick={() => { setAdminTab('analitica'); fetchAnalytics(); }}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'analitica' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <span className="text-base">📊</span> Big Data / Analítica
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => setAdminTab('productos')}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'productos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <span className="text-base">📦</span> Inventario
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => { setAdminTab('pos'); fetchProducts(); }}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'pos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <span className="text-base">🏪</span> Punto de Venta (POS)
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center justify-between gap-2 ${adminTab === 'pedidos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">🛒</span>
-                  <span>Pedidos / Ventas</span>
+          {/* Layout Container: sidebar nav arriba en móvil, lateral en lg */}
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+            {/* Navigation Menu: scroll horizontal en móvil, vertical en lg */}
+            <aside className="w-full lg:w-56 xl:w-64 shrink-0">
+              {/* Móvil: tabs scrollables horizontalmente */}
+              <div className="lg:hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
+                <div className="flex gap-1 p-2 min-w-max">
+                  {[
+                    { key: 'analitica', icon: '📊', label: 'Analítica', action: () => { setAdminTab('analitica'); fetchAnalytics(); } },
+                    { key: 'productos', icon: '📦', label: 'Inventario', action: () => setAdminTab('productos') },
+                    { key: 'pos', icon: '🏪', label: 'POS', action: () => { setAdminTab('pos'); fetchProducts(); } },
+                    { key: 'pedidos', icon: '🛒', label: 'Pedidos', action: () => { setAdminTab('pedidos'); fetchPedidosList(); } },
+                    { key: 'reclamos', icon: '📢', label: 'Reclamos', action: () => { setAdminTab('reclamos'); fetchReclamosList(); } },
+                    { key: 'resenas', icon: '⭐', label: 'Reseñas', action: () => { setAdminTab('resenas'); fetchAdminResenas(); } },
+                    { key: 'categorias', icon: '🏷️', label: 'Categorías', action: () => { setAdminTab('categorias'); fetchCategorias(); } },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={tab.action}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-heading font-bold text-xs transition whitespace-nowrap relative ${
+                        adminTab === tab.key
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                      {tab.key === 'pedidos' && webPedidosPendientesCount > 0 && (
+                        <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                          {webPedidosPendientesCount}
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
-                {webPedidosPendientesCount > 0 && (
-                  <span className={`text-[10px] md:text-xs px-2.5 py-0.5 rounded-full font-black tracking-tight transition flex items-center gap-1 shrink-0 ${
-                    adminTab === 'pedidos' 
-                      ? 'bg-rose-500 text-white shadow-xs' 
-                      : 'bg-rose-600 text-white shadow-md shadow-rose-600/40 animate-pulse'
-                  }`}>
-                    🚨 {webPedidosPendientesCount} {webPedidosPendientesCount === 1 ? 'Nuevo' : 'Nuevos'}
-                  </span>
-                )}
-              </button>
+              </div>
 
-              <button 
-                type="button"
-                onClick={() => { setAdminTab('reclamos'); fetchReclamosList(); }}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'reclamos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <span className="text-base">📢</span> Reclamos
-              </button>
+              {/* Desktop: sidebar vertical */}
+              <div className="hidden lg:block bg-white border border-slate-200 rounded-2xl p-3 shadow-sm space-y-1">
+                <p className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider px-3 pb-2 border-b border-slate-100 mb-2">
+                  Administración
+                </p>
 
-              <button 
-                type="button"
-                onClick={() => { setAdminTab('resenas'); fetchAdminResenas(); }}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'resenas' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <span className="text-base">⭐</span> Reseñas
-              </button>
+                <button 
+                  type="button"
+                  onClick={() => { setAdminTab('analitica'); fetchAnalytics(); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'analitica' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>📊</span> Big Data / Analítica
+                </button>
 
-              <button 
-                type="button"
-                onClick={() => { setAdminTab('categorias'); fetchCategorias(); }}
-                className={`w-full text-left px-3.5 py-3 rounded-xl font-heading font-bold text-xs md:text-sm transition flex items-center gap-2.5 ${adminTab === 'categorias' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <span className="text-base">🏷️</span> Categorías
-              </button>
+                <button 
+                  type="button"
+                  onClick={() => setAdminTab('productos')}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'productos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>📦</span> Inventario
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => { setAdminTab('pos'); fetchProducts(); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'pos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>🏪</span> Punto de Venta (POS)
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center justify-between gap-2 ${adminTab === 'pedidos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>🛒</span>
+                    <span>Pedidos / Ventas</span>
+                  </div>
+                  {webPedidosPendientesCount > 0 && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                      adminTab === 'pedidos' ? 'bg-rose-500 text-white' : 'bg-rose-600 text-white animate-pulse'
+                    }`}>
+                      {webPedidosPendientesCount}
+                    </span>
+                  )}
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => { setAdminTab('reclamos'); fetchReclamosList(); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'reclamos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>📢</span> Reclamos
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => { setAdminTab('resenas'); fetchAdminResenas(); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'resenas' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>⭐</span> Reseñas
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => { setAdminTab('categorias'); fetchCategorias(); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'categorias' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>🏷️</span> Categorías
+                </button>
+              </div>
             </aside>
 
             {/* Right Main Content Area */}
             <div className="flex-1 min-w-0">
 
           {adminTab === 'productos' ? (
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">
             
             {/* Left Col: Add Product Form */}
-            <div id="admin-form-container" className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
+            <div id="admin-form-container" className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm h-fit">
               <h2 className="text-lg font-heading font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex justify-between items-center">
                 {adminForm.id ? "Editar Producto" : "Agregar Nuevo Producto"}
                 {adminForm.id && (
@@ -2488,20 +2524,20 @@ function App() {
             <div className="lg:col-span-2 space-y-6">
               
               {/* Simple Stats Cards */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Total Productos</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mt-1">{products.length}</p>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm">
+                  <span className="text-[9px] sm:text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Total Productos</span>
+                  <p className="text-lg sm:text-xl md:text-2xl font-heading font-extrabold text-slate-900 mt-1">{products.length}</p>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                  <span className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Promedio Precio</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mt-1">
-                    S/ {products.length > 0 ? (products.reduce((acc, p) => acc + p.precio, 0) / products.length).toFixed(2) : '0.00'}
+                <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm">
+                  <span className="text-[9px] sm:text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider">Promedio S/</span>
+                  <p className="text-base sm:text-xl md:text-2xl font-heading font-extrabold text-slate-900 mt-1">
+                    {products.length > 0 ? (products.reduce((acc, p) => acc + p.precio, 0) / products.length).toFixed(0) : '0'}
                   </p>
                 </div>
-                <div className="bg-sky-400 border border-sky-300 rounded-xl p-4 shadow-sm">
-                  <span className="text-[10px] font-heading font-bold text-white uppercase tracking-wider">Stock Total</span>
-                  <p className="text-xl md:text-2xl font-heading font-extrabold text-white mt-1">
+                <div className="bg-sky-400 border border-sky-300 rounded-xl p-3 sm:p-4 shadow-sm">
+                  <span className="text-[9px] sm:text-[10px] font-heading font-bold text-white uppercase tracking-wider">Stock Total</span>
+                  <p className="text-lg sm:text-xl md:text-2xl font-heading font-extrabold text-white mt-1">
                     {products.reduce((acc, p) => acc + (p.stock || 0), 0)}
                   </p>
                 </div>
@@ -2528,31 +2564,31 @@ function App() {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto -mx-px">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
-                        <th className="px-6 py-3">Imagen</th>
-                        <th className="px-6 py-3">Nombre</th>
-                        <th className="px-6 py-3">Categoría</th>
-                        <th className="px-6 py-3">Precio</th>
-                        <th className="px-6 py-3">Stock</th>
-                        <th className="px-6 py-3 text-right">Acción</th>
+                        <th className="px-3 sm:px-6 py-3">Imagen</th>
+                        <th className="px-3 sm:px-6 py-3">Nombre</th>
+                        <th className="px-3 sm:px-6 py-3 hidden sm:table-cell">Categoría</th>
+                        <th className="px-3 sm:px-6 py-3">Precio</th>
+                        <th className="px-3 sm:px-6 py-3">Stock</th>
+                        <th className="px-3 sm:px-6 py-3 text-right">Acción</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
                       {filteredAdminProducts.map((prod) => (
                         <tr key={prod.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-3.5">
+                          <td className="px-3 sm:px-6 py-3.5">
                             <img 
                               src={optimizeCloudinaryUrl(prod.imagen)} 
                               alt="" 
                               loading="lazy"
-                              className="w-10 h-10 object-cover rounded-lg border border-slate-200"
+                              className="w-9 h-9 sm:w-10 sm:h-10 object-cover rounded-lg border border-slate-200"
                             />
                           </td>
-                          <td className="px-6 py-3.5 font-medium text-slate-800">
-                            <div className="max-w-[180px] truncate" title={prod.nombre}>
+                          <td className="px-3 sm:px-6 py-3.5 font-medium text-slate-800">
+                            <div className="max-w-[120px] sm:max-w-[180px] truncate text-xs sm:text-sm" title={prod.nombre}>
                               {prod.nombre}
                             </div>
                             {prod.badge && (
@@ -2561,22 +2597,22 @@ function App() {
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-3.5 text-slate-500 font-heading font-medium">
+                          <td className="px-3 sm:px-6 py-3.5 text-slate-500 font-heading font-medium text-xs hidden sm:table-cell">
                             {prod.categoria}
                           </td>
-                          <td className="px-6 py-3.5 font-semibold text-slate-900">
+                          <td className="px-3 sm:px-6 py-3.5 font-semibold text-slate-900 text-xs sm:text-sm whitespace-nowrap">
                             S/ {prod.precio.toFixed(2)}
                           </td>
-                          <td className="px-6 py-3.5">
-                            <div className="flex items-center gap-2">
+                          <td className="px-3 sm:px-6 py-3.5">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               <button
                                 type="button"
                                 onClick={() => updateStockQuickly(prod.id, Math.max(0, (prod.stock || 0) - 1))}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg font-bold text-xs transition"
+                                className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg font-bold text-xs transition"
                               >
                                 -
                               </button>
-                              <span className={`inline-flex items-center justify-center px-2 py-0.5 min-w-[32px] text-center rounded-full text-xs font-bold ${
+                              <span className={`inline-flex items-center justify-center px-1.5 py-0.5 min-w-[28px] text-center rounded-full text-xs font-bold ${
                                 (prod.stock || 0) === 0
                                   ? 'bg-rose-100 text-rose-700'
                                   : (prod.stock || 0) <= 5
@@ -2588,13 +2624,14 @@ function App() {
                               <button
                                 type="button"
                                 onClick={() => updateStockQuickly(prod.id, (prod.stock || 0) + 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg font-bold text-xs transition"
+                                className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg font-bold text-xs transition"
                               >
                                 +
                               </button>
                             </div>
                           </td>
-                          <td className="px-6 py-3.5 text-right space-x-3">
+                          <td className="px-3 sm:px-6 py-3.5 text-right">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-1">
                             <button
                               onClick={() => handleEditProduct(prod)}
                               className="text-brand hover:text-brand-hover font-heading font-bold text-xs hover:underline"
@@ -2607,6 +2644,7 @@ function App() {
                             >
                               Eliminar
                             </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -2625,7 +2663,7 @@ function App() {
           </div>
 
           ) : adminTab === 'pos' ? (
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
               {/* Left Column: Product Grid */}
               <div className="lg:col-span-2 space-y-6">
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -2661,7 +2699,7 @@ function App() {
                   </div>
 
                   {/* POS Products Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[50vh] sm:max-h-[600px] overflow-y-auto pr-1">
                     {allProducts
                       .filter((prod) => {
                         const matchesCategory = posCategory === 'Todos' || prod.categoria === posCategory;
@@ -2914,42 +2952,42 @@ function App() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-px">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
-                      <th className="px-6 py-3">Fecha</th>
-                      <th className="px-6 py-3">Cliente</th>
-                      <th className="px-6 py-3">Contacto</th>
-                      <th className="px-6 py-3">Tipo</th>
-                      <th className="px-6 py-3">Motivo</th>
-                      <th className="px-6 py-3">Estado</th>
-                      <th className="px-6 py-3">Acción</th>
+                      <th className="px-3 sm:px-6 py-3 whitespace-nowrap">Fecha</th>
+                      <th className="px-3 sm:px-6 py-3">Cliente</th>
+                      <th className="px-3 sm:px-6 py-3 hidden md:table-cell">Contacto</th>
+                      <th className="px-3 sm:px-6 py-3">Tipo</th>
+                      <th className="px-3 sm:px-6 py-3 hidden sm:table-cell">Motivo</th>
+                      <th className="px-3 sm:px-6 py-3">Estado</th>
+                      <th className="px-3 sm:px-6 py-3">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {reclamosList.map((rec) => (
                       <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors align-top">
-                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                        <td className="px-3 sm:px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
                           {new Date(rec.fecha).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-3.5">
-                          <p className="font-medium text-slate-800">{rec.nombre}</p>
-                          <p className="text-xs text-slate-500">{rec.tipo_doc} {rec.num_doc}</p>
+                        <td className="px-3 sm:px-6 py-3.5">
+                          <p className="font-medium text-slate-800 text-xs sm:text-sm">{rec.nombre}</p>
+                          <p className="text-[10px] text-slate-500">{rec.tipo_doc} {rec.num_doc}</p>
                         </td>
-                        <td className="px-6 py-3.5 text-slate-600 text-xs">
+                        <td className="px-3 sm:px-6 py-3.5 text-slate-600 text-xs hidden md:table-cell">
                           <p>📱 {rec.telefono}</p>
                           <p>✉️ {rec.correo}</p>
                         </td>
-                        <td className="px-6 py-3.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${rec.tipo_reclamo === 'Queja' ? 'bg-orange-100 text-orange-700' : 'bg-rose-100 text-rose-700'}`}>
+                        <td className="px-3 sm:px-6 py-3.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap ${rec.tipo_reclamo === 'Queja' ? 'bg-orange-100 text-orange-700' : 'bg-rose-100 text-rose-700'}`}>
                             {rec.tipo_reclamo}
                           </span>
                         </td>
-                        <td className="px-6 py-3.5 text-xs text-slate-600 max-w-xs">
+                        <td className="px-3 sm:px-6 py-3.5 text-xs text-slate-600 max-w-[120px] sm:max-w-xs hidden sm:table-cell">
                           <p className="line-clamp-2" title={rec.motivo}>{rec.motivo}</p>
                         </td>
-                        <td className="px-6 py-3.5">
+                        <td className="px-3 sm:px-6 py-3.5">
                           <select 
                             value={rec.estado || 'Pendiente'}
                             onChange={(e) => updateEstadoReclamo(rec.id, e.target.value)}
@@ -2964,8 +3002,8 @@ function App() {
                             <option value="Resuelto">Resuelto</option>
                           </select>
                         </td>
-                        <td className="px-6 py-3.5">
-                          <button onClick={() => deleteReclamo(rec.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded transition">🗑️ Eliminar</button>
+                        <td className="px-3 sm:px-6 py-3.5">
+                          <button onClick={() => deleteReclamo(rec.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded transition whitespace-nowrap">🗑️</button>
                         </td>
                       </tr>
                     ))}
@@ -3050,66 +3088,66 @@ function App() {
                 </div>
 
                 {/* Sub-Tabs: Historial Tienda Web vs POS */}
-                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
                   <button 
                     type="button"
                     onClick={() => setOrderSourceFilter('todos')} 
-                    className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1.5 ${orderSourceFilter === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1 ${orderSourceFilter === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
                     📋 Todos ({pedidosList.length})
                   </button>
                   <button 
                     type="button"
                     onClick={() => setOrderSourceFilter('web')} 
-                    className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1.5 ${orderSourceFilter === 'web' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1 ${orderSourceFilter === 'web' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
-                    🌐 Ventas Tienda Web ({pedidosList.filter(p => !p.metodo_entrega || !p.metodo_entrega.toLowerCase().includes('pos')).length})
+                    🌐 Web ({pedidosList.filter(p => !p.metodo_entrega || !p.metodo_entrega.toLowerCase().includes('pos')).length})
                   </button>
                   <button 
                     type="button"
                     onClick={() => setOrderSourceFilter('pos')} 
-                    className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1.5 ${orderSourceFilter === 'pos' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-heading font-bold transition flex items-center gap-1 ${orderSourceFilter === 'pos' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
-                    🏪 Ventas POS (Punto de Venta) ({pedidosList.filter(p => p.metodo_entrega && p.metodo_entrega.toLowerCase().includes('pos')).length})
+                    🏪 POS ({pedidosList.filter(p => p.metodo_entrega && p.metodo_entrega.toLowerCase().includes('pos')).length})
                   </button>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-px">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
-                      <th className="px-6 py-3">Fecha y Hora</th>
-                      <th className="px-6 py-3">Cliente</th>
-                      <th className="px-6 py-3">Canal / Entrega</th>
-                      <th className="px-6 py-3">Monto</th>
-                      <th className="px-6 py-3">Detalle</th>
-                      <th className="px-6 py-3">Estado</th>
-                      <th className="px-6 py-3">Acción</th>
+                      <th className="px-3 sm:px-6 py-3 whitespace-nowrap">Fecha</th>
+                      <th className="px-3 sm:px-6 py-3">Cliente</th>
+                      <th className="px-3 sm:px-6 py-3 hidden md:table-cell">Canal</th>
+                      <th className="px-3 sm:px-6 py-3 whitespace-nowrap">Monto</th>
+                      <th className="px-3 sm:px-6 py-3 hidden sm:table-cell">Detalle</th>
+                      <th className="px-3 sm:px-6 py-3">Estado</th>
+                      <th className="px-3 sm:px-6 py-3">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredPedidos.map((ped) => (
                       <tr key={ped.id} className="hover:bg-slate-50/50 transition-colors align-top">
-                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-600 font-mono">
-                          {new Date(ped.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                        <td className="px-3 sm:px-6 py-3.5 whitespace-nowrap text-xs text-slate-600 font-mono">
+                          {new Date(ped.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}
                         </td>
-                        <td className="px-6 py-3.5">
-                          <p className="font-medium text-slate-800">{ped.nombre}</p>
-                          <p className="text-xs text-slate-500">📱 {ped.telefono}</p>
+                        <td className="px-3 sm:px-6 py-3.5">
+                          <p className="font-medium text-slate-800 text-xs sm:text-sm">{ped.nombre}</p>
+                          <p className="text-[10px] text-slate-500">📱 {ped.telefono}</p>
                         </td>
-                        <td className="px-6 py-3.5">
+                        <td className="px-3 sm:px-6 py-3.5 hidden md:table-cell">
                           <p className="text-[10px] uppercase font-bold text-slate-500">{ped.metodo_entrega ? ped.metodo_entrega.split('-')[0] : 'Envío'}</p>
                           <p className="text-xs text-slate-700 max-w-[140px] truncate">{ped.metodo_entrega ? ped.metodo_entrega.split('-')[1] : 'Sin especificar'}</p>
                         </td>
-                        <td className="px-6 py-3.5 font-bold text-slate-900 text-xs">S/ {ped.total.toFixed(2)}</td>
-                        <td className="px-6 py-3.5 text-xs text-slate-600">
+                        <td className="px-3 sm:px-6 py-3.5 font-bold text-slate-900 text-xs whitespace-nowrap">S/ {ped.total.toFixed(2)}</td>
+                        <td className="px-3 sm:px-6 py-3.5 text-xs text-slate-600 hidden sm:table-cell">
                           <ul className="list-disc pl-4">
                             {ped.detalles && ped.detalles.length > 0 ? ped.detalles.map((d, i) => (
                               <li key={i}>{d.quantity}x {d.nombre}</li>
                             )) : <li>Sin detalles</li>}
                           </ul>
                         </td>
-                        <td className="px-6 py-3.5">
+                        <td className="px-3 sm:px-6 py-3.5">
                           <select value={ped.estado || 'Pendiente'} onChange={(e) => updateEstadoPedido(ped.id, e.target.value)} className={`text-xs font-bold rounded px-2 py-1 border-none focus:ring-0 ${ped.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' : ped.estado === 'En Camino' ? 'bg-sky-100 text-sky-700' : ped.estado === 'Cancelado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                             <option value="Pendiente">Pendiente</option>
                             <option value="En Camino">En Camino</option>
@@ -3117,8 +3155,8 @@ function App() {
                             <option value="Cancelado">Cancelado</option>
                           </select>
                         </td>
-                        <td className="px-6 py-3.5">
-                          <button onClick={() => deletePedido(ped.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded transition">🗑️ Eliminar</button>
+                        <td className="px-3 sm:px-6 py-3.5">
+                          <button onClick={() => deletePedido(ped.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded transition whitespace-nowrap">🗑️</button>
                         </td>
                       </tr>
                     ))}
@@ -3141,43 +3179,43 @@ function App() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-px">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-heading font-bold uppercase tracking-wider">
-                      <th className="px-6 py-3">Fecha</th>
-                      <th className="px-6 py-3">Autor</th>
-                      <th className="px-6 py-3">Calificación</th>
-                      <th className="px-6 py-3">Comentario</th>
-                      <th className="px-6 py-3">Visibilidad</th>
-                      <th className="px-6 py-3">Acción</th>
+                      <th className="px-3 sm:px-6 py-3 whitespace-nowrap">Fecha</th>
+                      <th className="px-3 sm:px-6 py-3">Autor</th>
+                      <th className="px-3 sm:px-6 py-3">Rating</th>
+                      <th className="px-3 sm:px-6 py-3 hidden sm:table-cell">Comentario</th>
+                      <th className="px-3 sm:px-6 py-3">Visible</th>
+                      <th className="px-3 sm:px-6 py-3">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {resenasList.map((res) => (
                       <tr key={res.id} className="hover:bg-slate-50/50 transition-colors align-top">
-                        <td className="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                        <td className="px-3 sm:px-6 py-3.5 whitespace-nowrap text-xs text-slate-500">
                           {new Date(res.fecha).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-3.5">
-                          <p className="font-medium text-slate-800">{res.autor}</p>
+                        <td className="px-3 sm:px-6 py-3.5">
+                          <p className="font-medium text-slate-800 text-xs sm:text-sm">{res.autor}</p>
                         </td>
-                        <td className="px-6 py-3.5 text-xs text-amber-500">
+                        <td className="px-3 sm:px-6 py-3.5 text-xs text-amber-500 whitespace-nowrap">
                           {'★'.repeat(res.calificacion)}{'☆'.repeat(5 - res.calificacion)}
                         </td>
-                        <td className="px-6 py-3.5 text-xs text-slate-600 max-w-xs">
-                          {res.comentario}
+                        <td className="px-3 sm:px-6 py-3.5 text-xs text-slate-600 max-w-[150px] sm:max-w-xs hidden sm:table-cell">
+                          <p className="line-clamp-2">{res.comentario}</p>
                         </td>
-                        <td className="px-6 py-3.5">
+                        <td className="px-3 sm:px-6 py-3.5">
                           <button 
                             onClick={() => updateAprobacionResena(res.id, !res.aprobado)}
-                            className={`text-xs font-bold px-3 py-1 rounded-full ${res.aprobado ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}
+                            className={`text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap ${res.aprobado ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}
                           >
-                            {res.aprobado ? 'Aprobado (Público)' : 'Oculto'}
+                            {res.aprobado ? '✅ Público' : '🚫 Oculto'}
                           </button>
                         </td>
-                        <td className="px-6 py-3.5">
-                          <button onClick={() => deleteResena(res.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded transition">🗑️ Eliminar</button>
+                        <td className="px-3 sm:px-6 py-3.5">
+                          <button onClick={() => deleteResena(res.id)} className="text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded transition">🗑️</button>
                         </td>
                       </tr>
                     ))}

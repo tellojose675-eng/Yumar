@@ -2353,7 +2353,7 @@ function App() {
                   onClick={() => { setAdminTab('analitica'); fetchAnalytics(); }}
                   className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'analitica' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
-                  <span>📊</span> Big Data / Analítica
+                  <span>📊</span> Métricas y Rendimiento
                 </button>
 
                 <button 
@@ -3303,23 +3303,24 @@ function App() {
             <div className="space-y-6">
               {/* ANALITICA / BIG DATA DASHBOARD */}
               {/* Header Banner */}
-              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-6 rounded-2xl shadow-lg border border-indigo-500/20">
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-5 sm:p-6 rounded-2xl shadow-md border border-indigo-500/20">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <span className="inline-block bg-indigo-500/20 text-indigo-300 font-mono text-xs px-2.5 py-1 rounded-md border border-indigo-400/30 mb-2 font-bold">
-                      ⚡ Big Data & Business Intelligence Dashboard
+                    <span className="inline-flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 font-heading text-xs px-2.5 py-1 rounded-md border border-indigo-400/30 mb-2 font-bold tracking-wide">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Panel de Métricas
                     </span>
                     <h2 className="text-xl md:text-2xl font-heading font-extrabold tracking-tight">
-                      Análisis de Datos Masivos e Indicadores de Negocio
+                      Rendimiento y Ventas del Negocio
                     </h2>
                     <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
-                      Procesamiento de datos en tiempo real sobre transacciones, catálogo, comportamiento de compra y nivel de satisfacción de clientes.
+                      Resumen consolidado de ventas, pedidos activos y productos con mayor demanda.
                     </p>
                   </div>
                   <button
                     onClick={fetchAnalytics}
                     disabled={analyticsLoading}
-                    className="self-start md:self-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-md shadow-indigo-600/30 shrink-0"
+                    className="self-start md:self-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-md shadow-indigo-600/30 shrink-0 active:scale-95"
                   >
                     {analyticsLoading ? '⏳ Cargando...' : '🔄 Actualizar Métricas'}
                   </button>
@@ -3381,7 +3382,7 @@ function App() {
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                   <h3 className="font-heading font-bold text-slate-900 text-base mb-4 flex items-center justify-between">
                     <span>🏷️ Distribución por Categorías</span>
-                    <span className="text-xs font-normal text-slate-500">Agregación Big Data</span>
+                    <span className="text-xs font-normal text-slate-500">Catálogo Activo</span>
                   </h3>
                   {analyticsData?.ventasPorCategoria?.length > 0 ? (
                     <div className="space-y-4">
@@ -3413,7 +3414,7 @@ function App() {
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                   <h3 className="font-heading font-bold text-slate-900 text-base mb-4 flex items-center justify-between">
                     <span>🔥 Top Productos Más Vendidos</span>
-                    <span className="text-xs font-normal text-slate-500">Ranking Algorítmico</span>
+                    <span className="text-xs font-normal text-slate-500">Mayor Demanda</span>
                   </h3>
                   {analyticsData?.topProductos?.length > 0 ? (
                     <div className="divide-y divide-slate-100">
@@ -3441,77 +3442,6 @@ function App() {
                   ) : (
                     <p className="text-xs text-slate-400 py-8 text-center">Registra ventas para ver los productos líderes.</p>
                   )}
-                </div>
-              </div>
-
-              {/* Section 3: Payment Methods & Recent Log */}
-              <div className="grid lg:grid-cols-3 gap-6">
-                {/* Payment methods */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs lg:col-span-1">
-                  <h3 className="font-heading font-bold text-slate-900 text-base mb-4">💳 Métodos de Pago</h3>
-                  {analyticsData?.ventasPorMetodoPago?.length > 0 ? (
-                    <div className="space-y-3">
-                      {analyticsData.ventasPorMetodoPago.map((m, idx) => (
-                        <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-bold text-slate-800 capitalize">{m.metodo ? m.metodo.replace('_', ' - ') : 'Efectivo'}</p>
-                            <p className="text-[10px] text-slate-500">{m.cantidad} transacción(es)</p>
-                          </div>
-                          <span className="text-xs font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">
-                            S/ {parseFloat(m.total || 0).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 py-6 text-center">Sin transacciones procesadas.</p>
-                  )}
-                </div>
-
-                {/* Real-time Order Stream */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs lg:col-span-2">
-                  <h3 className="font-heading font-bold text-slate-900 text-base mb-4 flex items-center justify-between">
-                    <span>⚡ Flujo Reciente de Datos (Pedidos)</span>
-                    <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">En Vivo</span>
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-500 font-bold uppercase text-[9px]">
-                          <th className="p-2">ID</th>
-                          <th className="p-2">Fecha y Hora</th>
-                          <th className="p-2">Cliente</th>
-                          <th className="p-2">Monto</th>
-                          <th className="p-2">Pago</th>
-                          <th className="p-2">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {analyticsData?.pedidosRecientes?.map((p) => (
-                          <tr key={p.id} className="hover:bg-slate-50/50">
-                            <td className="p-2 font-mono text-slate-400">#{p.id}</td>
-                            <td className="p-2 font-mono text-[10px] text-slate-500">{new Date(p.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</td>
-                            <td className="p-2 font-medium text-slate-800">{p.nombre}</td>
-                            <td className="p-2 font-bold text-slate-900">S/ {parseFloat(p.total).toFixed(2)}</td>
-                            <td className="p-2 capitalize text-slate-600">{p.metodo_pago ? p.metodo_pago.replace('_', ' ') : 'Efectivo'}</td>
-                            <td className="p-2">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                p.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' :
-                                p.estado === 'Cancelado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                              }`}>
-                                {p.estado || 'Pendiente'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {(!analyticsData?.pedidosRecientes || analyticsData.pedidosRecientes.length === 0) && (
-                          <tr>
-                            <td colSpan={5} className="p-4 text-center text-slate-400">Sin datos de pedidos recientes.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
               </div>
             </div>

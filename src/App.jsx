@@ -66,11 +66,27 @@ function App() {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
-  // Login State
+  // Login & Roles State
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
     return localStorage.getItem('yumar_adminAuth') === 'true';
   });
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('yumar_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [usuariosList, setUsuariosList] = useState([]);
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false);
+  const [nuevoUsuario, setNuevoUsuario] = useState({
+    nombre: '',
+    username: '',
+    password: '',
+    rol: 'vendedor'
+  });
 
 
   // Checkout State
@@ -335,8 +351,18 @@ function App() {
       if (adminTab === 'reclamos') fetchReclamosList();
       if (adminTab === 'pedidos') fetchPedidosList();
       if (adminTab === 'resenas') fetchAdminResenas();
+      if (adminTab === 'usuarios') fetchUsuariosList();
     }
   }, [viewMode, isAdminAuthenticated, adminTab]);
+
+  // Si el usuario autenticado es vendedor, restringir vistas a solo Inventario y POS
+  useEffect(() => {
+    if (viewMode === 'admin' && currentUser?.rol === 'vendedor') {
+      if (adminTab !== 'pos' && adminTab !== 'productos') {
+        setAdminTab('pos');
+      }
+    }
+  }, [viewMode, currentUser, adminTab]);
 
   // Admin panel: refresca los pedidos continuamente para el contador en tiempo real en el menú
   useEffect(() => {
@@ -843,16 +869,114 @@ function App() {
     }
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
-      setIsAdminAuthenticated(true);
-      setViewMode('admin');
-      localStorage.setItem('yumar_adminAuth', 'true');
-      localStorage.setItem('yumar_viewMode', 'admin');
-      showToast("Bienvenido al Panel de Control");
-    } else {
-      showToast("Credenciales incorrectas");
+    if (!loginForm.username || !loginForm.password) {
+      showToast("Ingresa usuario y contraseña");
+      return;
+    }
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: loginForm.username,
+          password: loginForm.password
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsAdminAuthenticated(true);
+        setCurrentUser(data.user);
+        localStorage.setItem('yumar_adminAuth', 'true');
+        localStorage.setItem('yumar_viewMode', 'admin');
+        localStorage.setItem('yumar_user', JSON.stringify(data.user));
+
+        if (data.user.rol === 'vendedor') {
+          setAdminTab('pos');
+          localStorage.setItem('yumar_adminTab', 'pos');
+        } else {
+          setAdminTab('analitica');
+          localStorage.setItem('yumar_adminTab', 'analitica');
+        }
+
+        setViewMode('admin');
+        showToast(`Bienvenido ${data.user.nombre}`);
+      } else {
+        showToast(data.error || "Credenciales incorrectas");
+      }
+    } catch (err) {
+      if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
+        const fallback = { id: 1, username: 'admin', nombre: 'Administrador Principal', rol: 'admin' };
+        setIsAdminAuthenticated(true);
+        setCurrentUser(fallback);
+        localStorage.setItem('yumar_adminAuth', 'true');
+        localStorage.setItem('yumar_viewMode', 'admin');
+        localStorage.setItem('yumar_user', JSON.stringify(fallback));
+        setViewMode('admin');
+        showToast("Bienvenido al Panel de Control");
+      } else {
+        showToast("Error de conexión");
+      }
+    }
+  };
+
+  const fetchUsuariosList = async () => {
+    try {
+      setLoadingUsuarios(true);
+      const res = await fetch('/api/usuarios');
+      if (res.ok) {
+        setUsuariosList(await res.json());
+      }
+    } catch (err) {
+      console.error("Error al cargar usuarios:", err);
+    } finally {
+      setLoadingUsuarios(false);
+    }
+  };
+
+  const handleCrearUsuario = async (e) => {
+    e.preventDefault();
+    if (!nuevoUsuario.nombre || !nuevoUsuario.username || !nuevoUsuario.password) {
+      showToast("Completa todos los campos");
+      return;
+    }
+    try {
+      const res = await fetch('/api/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevoUsuario)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast("Usuario creado con éxito");
+        setNuevoUsuario({ nombre: '', username: '', password: '', rol: 'vendedor' });
+        fetchUsuariosList();
+      } else {
+        showToast(data.error || "Error al crear usuario");
+      }
+    } catch (err) {
+      showToast("Error de conexión al crear usuario");
+    }
+  };
+
+  const handleEliminarUsuario = async (id, username) => {
+    if (username === 'admin') {
+      showToast("No se puede eliminar al Administrador Principal");
+      return;
+    }
+    if (!window.confirm(`¿Estás seguro de revocar el acceso al usuario "${username}"?`)) return;
+    try {
+      const res = await fetch(`/api/usuarios/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        showToast("Usuario eliminado");
+        fetchUsuariosList();
+      } else {
+        showToast(data.error || "Error al eliminar");
+      }
+    } catch (err) {
+      showToast("Error de conexión");
     }
   };
 
@@ -1120,16 +1244,22 @@ function App() {
       {viewMode === 'admin' ? (
         <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-lg print:hidden">
           <div className="w-full px-3.5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-3">
-            {/* Left: Brand + Admin Badge */}
+            {/* Left: Brand + Admin/Vendedor Badge */}
             <div className="flex items-center gap-2 sm:gap-3">
               <span className="font-cursive text-2xl sm:text-3xl text-brand leading-none select-none tracking-wide">
                 YuMar
               </span>
-              <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] sm:text-xs font-heading font-extrabold px-2 sm:px-2.5 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Admin
+              <span className={`text-[10px] sm:text-xs font-heading font-extrabold px-2 sm:px-2.5 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-1.5 shadow-xs ${
+                currentUser?.rol === 'vendedor'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                  : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${currentUser?.rol === 'vendedor' ? 'bg-sky-400' : 'bg-emerald-400 animate-pulse'}`}></span>
+                {currentUser?.rol === 'vendedor'
+                  ? `Vendedor: ${currentUser?.nombre?.split(' ')[0] || currentUser?.username}`
+                  : 'Admin'}
               </span>
-              {webPedidosPendientesCount > 0 && (
+              {currentUser?.rol !== 'vendedor' && webPedidosPendientesCount > 0 && (
                 <span className="hidden sm:inline-flex items-center gap-1.5 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-bold px-2.5 py-0.5 rounded-full shadow-xs">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
                   {webPedidosPendientesCount} {webPedidosPendientesCount === 1 ? 'nuevo pedido' : 'nuevos pedidos'}
@@ -1153,8 +1283,10 @@ function App() {
                   onClick={() => { 
                     setViewMode('shop'); 
                     setIsAdminAuthenticated(false); 
+                    setCurrentUser(null);
                     localStorage.setItem('yumar_viewMode', 'shop');
                     localStorage.setItem('yumar_adminAuth', 'false');
+                    localStorage.removeItem('yumar_user');
                     if (window.location.hash) history.replaceState(null, '', window.location.pathname);
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-heading font-bold text-rose-300 hover:text-white bg-rose-500/15 hover:bg-rose-600 border border-rose-500/30 hover:border-rose-600 transition shadow-sm active:scale-95"
@@ -2305,114 +2437,88 @@ function App() {
           </div>
 
           {/* Layout Container: sidebar nav arriba en móvil, lateral en lg */}
+          {/* Layout Container: sidebar nav arriba en móvil, lateral en lg */}
           <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
             {/* Navigation Menu: scroll horizontal en móvil, vertical en lg */}
             <aside className="w-full lg:w-56 xl:w-64 shrink-0">
-              {/* Móvil: tabs scrollables horizontalmente */}
-              <div className="lg:hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
-                <div className="flex gap-1 p-2 min-w-max">
+              {/* Móvil: tabs scrollables horizontalmente filtrados por rol */}
+              <div className="lg:hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto cat-nav-scroll">
+                <div className="flex gap-1.5 p-2 min-w-max">
                   {[
-                    { key: 'analitica', icon: '📊', label: 'Analítica', action: () => { setAdminTab('analitica'); fetchAnalytics(); } },
-                    { key: 'productos', icon: '📦', label: 'Inventario', action: () => setAdminTab('productos') },
-                    { key: 'pos', icon: '🏪', label: 'POS', action: () => { setAdminTab('pos'); fetchProducts(); } },
-                    { key: 'pedidos', icon: '🛒', label: 'Pedidos', action: () => { setAdminTab('pedidos'); fetchPedidosList(); } },
-                    { key: 'reclamos', icon: '📢', label: 'Reclamos', action: () => { setAdminTab('reclamos'); fetchReclamosList(); } },
-                    { key: 'resenas', icon: '⭐', label: 'Reseñas', action: () => { setAdminTab('resenas'); fetchAdminResenas(); } },
-                    { key: 'categorias', icon: '🏷️', label: 'Categorías', action: () => { setAdminTab('categorias'); fetchCategorias(); } },
-                  ].map(tab => (
+                    { key: 'analitica', icon: '📊', label: 'Métricas', roles: ['admin'], action: () => { setAdminTab('analitica'); fetchAnalytics(); } },
+                    { key: 'productos', icon: '📦', label: 'Inventario', roles: ['admin', 'vendedor'], action: () => setAdminTab('productos') },
+                    { key: 'pos', icon: '🏪', label: 'POS', roles: ['admin', 'vendedor'], action: () => { setAdminTab('pos'); fetchProducts(); } },
+                    { key: 'pedidos', icon: '🛒', label: 'Pedidos', roles: ['admin'], action: () => { setAdminTab('pedidos'); fetchPedidosList(); }, badge: webPedidosPendientesCount },
+                    { key: 'reclamos', icon: '📢', label: 'Reclamos', roles: ['admin'], action: () => { setAdminTab('reclamos'); fetchReclamosList(); } },
+                    { key: 'resenas', icon: '⭐', label: 'Reseñas', roles: ['admin'], action: () => { setAdminTab('resenas'); fetchAdminResenas(); } },
+                    { key: 'categorias', icon: '🏷️', label: 'Categorías', roles: ['admin'], action: () => { setAdminTab('categorias'); fetchCategorias(); } },
+                    { key: 'usuarios', icon: '👥', label: 'Usuarios', roles: ['admin'], action: () => { setAdminTab('usuarios'); fetchUsuariosList(); } },
+                  ]
+                    .filter(t => t.roles.includes(currentUser?.rol || 'admin'))
+                    .map(tab => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={tab.action}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-heading font-bold text-xs transition whitespace-nowrap relative ${
+                          adminTab === tab.key
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                        {tab.badge > 0 && (
+                          <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                            {tab.badge}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                </div>
+              </div>
+
+              {/* Desktop: sidebar vertical filtrado por rol */}
+              <div className="hidden lg:block bg-white border border-slate-200 rounded-2xl p-3 shadow-sm space-y-1">
+                <p className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider px-3 pb-2 border-b border-slate-100 mb-2">
+                  {currentUser?.rol === 'vendedor' ? 'Punto de Venta' : 'Administración'}
+                </p>
+
+                {[
+                  { key: 'analitica', icon: '📊', fullLabel: 'Métricas y Rendimiento', roles: ['admin'], action: () => { setAdminTab('analitica'); fetchAnalytics(); } },
+                  { key: 'productos', icon: '📦', fullLabel: 'Inventario', roles: ['admin', 'vendedor'], action: () => setAdminTab('productos') },
+                  { key: 'pos', icon: '🏪', fullLabel: 'Punto de Venta (POS)', roles: ['admin', 'vendedor'], action: () => { setAdminTab('pos'); fetchProducts(); } },
+                  { key: 'pedidos', icon: '🛒', fullLabel: 'Pedidos / Ventas', roles: ['admin'], action: () => { setAdminTab('pedidos'); fetchPedidosList(); }, badge: webPedidosPendientesCount },
+                  { key: 'reclamos', icon: '📢', fullLabel: 'Reclamos', roles: ['admin'], action: () => { setAdminTab('reclamos'); fetchReclamosList(); } },
+                  { key: 'resenas', icon: '⭐', fullLabel: 'Reseñas', roles: ['admin'], action: () => { setAdminTab('resenas'); fetchAdminResenas(); } },
+                  { key: 'categorias', icon: '🏷️', fullLabel: 'Categorías', roles: ['admin'], action: () => { setAdminTab('categorias'); fetchCategorias(); } },
+                  { key: 'usuarios', icon: '👥', fullLabel: 'Usuarios y Roles', roles: ['admin'], action: () => { setAdminTab('usuarios'); fetchUsuariosList(); } },
+                ]
+                  .filter(t => t.roles.includes(currentUser?.rol || 'admin'))
+                  .map(tab => (
                     <button
                       key={tab.key}
                       type="button"
                       onClick={tab.action}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-heading font-bold text-xs transition whitespace-nowrap relative ${
+                      className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center justify-between gap-2 ${
                         adminTab === tab.key
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-100'
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                          : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
-                      {tab.key === 'pedidos' && webPedidosPendientesCount > 0 && (
-                        <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
-                          {webPedidosPendientesCount}
+                      <div className="flex items-center gap-2.5">
+                        <span>{tab.icon}</span>
+                        <span>{tab.fullLabel}</span>
+                      </div>
+                      {tab.badge > 0 && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                          adminTab === tab.key ? 'bg-rose-500 text-white' : 'bg-rose-600 text-white animate-pulse'
+                        }`}>
+                          {tab.badge}
                         </span>
                       )}
                     </button>
                   ))}
-                </div>
-              </div>
-
-              {/* Desktop: sidebar vertical */}
-              <div className="hidden lg:block bg-white border border-slate-200 rounded-2xl p-3 shadow-sm space-y-1">
-                <p className="text-[10px] font-heading font-bold text-slate-400 uppercase tracking-wider px-3 pb-2 border-b border-slate-100 mb-2">
-                  Administración
-                </p>
-
-                <button 
-                  type="button"
-                  onClick={() => { setAdminTab('analitica'); fetchAnalytics(); }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'analitica' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>📊</span> Métricas y Rendimiento
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => setAdminTab('productos')}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'productos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>📦</span> Inventario
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => { setAdminTab('pos'); fetchProducts(); }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'pos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>🏪</span> Punto de Venta (POS)
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => { setAdminTab('pedidos'); fetchPedidosList(); }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center justify-between gap-2 ${adminTab === 'pedidos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>🛒</span>
-                    <span>Pedidos / Ventas</span>
-                  </div>
-                  {webPedidosPendientesCount > 0 && (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
-                      adminTab === 'pedidos' ? 'bg-rose-500 text-white' : 'bg-rose-600 text-white animate-pulse'
-                    }`}>
-                      {webPedidosPendientesCount}
-                    </span>
-                  )}
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => { setAdminTab('reclamos'); fetchReclamosList(); }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'reclamos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>📢</span> Reclamos
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => { setAdminTab('resenas'); fetchAdminResenas(); }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'resenas' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>⭐</span> Reseñas
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => { setAdminTab('categorias'); fetchCategorias(); }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl font-heading font-bold text-sm transition flex items-center gap-2.5 ${adminTab === 'categorias' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>🏷️</span> Categorías
-                </button>
               </div>
             </aside>
 
@@ -3297,6 +3403,202 @@ function App() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          ) : adminTab === 'usuarios' && (currentUser?.rol || 'admin') === 'admin' ? (
+            <div className="space-y-6">
+              {/* Encabezado del Módulo de Usuarios */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl text-xl">👥</span>
+                    <h3 className="font-heading font-extrabold text-slate-900 text-xl">Gestión de Usuarios y Roles</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Crea colaboradores y define sus permisos de acceso (Administrador o Vendedor).
+                  </p>
+                </div>
+                <button
+                  onClick={fetchUsuariosList}
+                  disabled={loadingUsuarios}
+                  className="self-start md:self-auto bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95"
+                >
+                  {loadingUsuarios ? '⏳' : '🔄'} Actualizar lista
+                </button>
+              </div>
+
+              {/* Formulario y Listado */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Formulario Crear Usuario */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm lg:col-span-1">
+                  <h4 className="font-heading font-bold text-slate-900 text-base mb-1 flex items-center gap-2">
+                    <span>➕</span> Nuevo Colaborador
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mb-4">Ingresa credenciales para otorgar acceso al panel.</p>
+
+                  <form onSubmit={handleCrearUsuario} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Nombre y Apellidos</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Carlos Mendoza"
+                        value={nuevoUsuario.nombre}
+                        onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, nombre: e.target.value })}
+                        required
+                        className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:outline-brand bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Usuario (Login)</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: carlosm"
+                        value={nuevoUsuario.username}
+                        onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, username: e.target.value })}
+                        required
+                        className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:outline-brand bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Contraseña</label>
+                      <input
+                        type="password"
+                        placeholder="••••••••"
+                        value={nuevoUsuario.password}
+                        onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, password: e.target.value })}
+                        required
+                        className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:outline-brand bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Rol y Permisos</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNuevoUsuario({ ...nuevoUsuario, rol: 'vendedor' })}
+                          className={`p-3 rounded-xl border text-left transition ${
+                            nuevoUsuario.rol === 'vendedor'
+                              ? 'border-sky-500 bg-sky-50/50 shadow-xs ring-2 ring-sky-500/20'
+                              : 'border-slate-200 hover:border-slate-300 bg-white'
+                          }`}
+                        >
+                          <span className="text-lg block mb-1">💼</span>
+                          <span className="text-xs font-bold block text-slate-900">Vendedor</span>
+                          <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">Inventario y POS</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setNuevoUsuario({ ...nuevoUsuario, rol: 'admin' })}
+                          className={`p-3 rounded-xl border text-left transition ${
+                            nuevoUsuario.rol === 'admin'
+                              ? 'border-indigo-600 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-600/20'
+                              : 'border-slate-200 hover:border-slate-300 bg-white'
+                          }`}
+                        >
+                          <span className="text-lg block mb-1">🛡️</span>
+                          <span className="text-xs font-bold block text-slate-900">Admin</span>
+                          <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">Control Total</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-heading font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-slate-900/10 active:scale-95"
+                    >
+                      Guardar y Crear Usuario
+                    </button>
+                  </form>
+                </div>
+
+                {/* Tabla de Usuarios Activos */}
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden lg:col-span-2">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-heading font-bold text-slate-900 text-base">Equipo y Usuarios Registrados</h4>
+                      <p className="text-[11px] text-slate-500">Cuentas activas con credenciales en la plataforma.</p>
+                    </div>
+                    <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                      {usuariosList.length} usuario(s)
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                          <th className="px-5 py-3">Colaborador</th>
+                          <th className="px-5 py-3">Usuario (Login)</th>
+                          <th className="px-5 py-3">Rol asignado</th>
+                          <th className="px-5 py-3 hidden sm:table-cell">Permisos</th>
+                          <th className="px-5 py-3 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {usuariosList.map((u) => (
+                          <tr key={u.id} className="hover:bg-slate-50/50 transition">
+                            <td className="px-5 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  u.rol === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-sky-100 text-sky-700'
+                                }`}>
+                                  {u.nombre ? u.nombre.charAt(0).toUpperCase() : 'U'}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-slate-900 truncate">{u.nombre}</p>
+                                  {u.username === 'admin' && (
+                                    <span className="text-[9px] text-amber-600 font-semibold">Super Admin</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 font-mono text-slate-600 text-xs">
+                              @{u.username}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              {u.rol === 'admin' ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">
+                                  <span>🛡️</span> Administrador
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full">
+                                  <span>💼</span> Vendedor
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-500 text-[11px] hidden sm:table-cell">
+                              {u.rol === 'admin' ? 'Acceso Total + Finanzas' : 'Solo POS e Inventario'}
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              {u.username === 'admin' ? (
+                                <span className="text-[10px] text-slate-400 italic">Protegido</span>
+                              ) : (
+                                <button
+                                  onClick={() => handleEliminarUsuario(u.id, u.username)}
+                                  className="text-xs text-rose-500 hover:text-white bg-rose-50 hover:bg-rose-600 p-2 rounded-lg transition"
+                                  title={`Eliminar acceso a @${u.username}`}
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {usuariosList.length === 0 && !loadingUsuarios && (
+                          <tr>
+                            <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                              No hay usuarios adicionales registrados.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (

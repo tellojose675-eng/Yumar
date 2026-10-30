@@ -161,6 +161,30 @@ const initializeDatabase = async () => {
       }
     }
 
+    // Create usuarios table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        nombre TEXT NOT NULL,
+        rol TEXT NOT NULL DEFAULT 'vendedor',
+        activo BOOLEAN DEFAULT true,
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed default admin user if empty
+    const usersCount = await pool.query('SELECT COUNT(*) as count FROM usuarios');
+    if (usersCount.rows[0].count === '0' || usersCount.rows[0].count === 0) {
+      console.log('Seeding initial admin user...');
+      await pool.query(`
+        INSERT INTO usuarios (username, password, nombre, rol)
+        VALUES ('admin', 'admin123', 'Administrador Principal', 'admin')
+        ON CONFLICT (username) DO NOTHING
+      `);
+    }
+
     // Check if table is empty and seed if needed
     const result = await pool.query('SELECT COUNT(*) as count FROM productos');
     if (result.rows[0].count === '0' || result.rows[0].count === 0) {
@@ -744,6 +768,133 @@ app.delete('/api/categorias/:id', async (req, res) => {
     const { id } = req.params;
     await pool.query("DELETE FROM categorias WHERE id = $1", [id]);
     res.json({ message: "Categoría eliminada" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// USUARIOS Y AUTENTICACIÓN POR ROLES
+// ==========================================
+
+// POST /api/auth/login - Autenticación de usuarios por rol (Admin o Vendedor)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Usuario y contraseña requeridos" });
+    }
+
+    const trimmedUser = username.trim().toLowerCase();
+
+    // Consultar en la base de datos
+    try {
+      const result = await pool.query(
+        "SELECT id, username, password, nombre, rol, activo FROM usuarios WHERE LOWER(username) = $1",
+        [trimmedUser]
+      );
+
+      if (result.rows.length > 0) {
+        const user = result.rows[0];
+        if (user.password !== password) {
+          return res.status(401).json({ error: "Contraseña incorrecta" });
+        }
+        if (!user.activo) {
+          return res.status(403).json({ error: "Este usuario se encuentra inactivo. Contacte al administrador." });
+        }
+        return res.json({
+          success: true,
+          user: {
+            id: user.id,
+            username: user.username,
+            nombre: user.nombre,
+            rol: user.rol || 'vendedor'
+          }
+        });
+      }
+    } catch (dbErr) {
+      console.warn("DB query failed, checking fallback admin:", dbErr.message);
+    }
+
+    // Fallback de administrador por defecto si aún no se inicializó en DB
+    if (trimmedUser === 'admin' && password === 'admin123') {
+      return res.json({
+        success: true,
+        user: {
+          id: 1,
+          username: 'admin',
+          nombre: 'Administrador Principal',
+          rol: 'admin'
+        }
+      });
+    }
+
+    return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+  } catch (err) {
+    console.error("Error en login:", err);
+    if (req.body?.username === 'admin' && req.body?.password === 'admin123') {
+      return res.json({
+        success: true,
+        user: { id: 1, username: 'admin', nombre: 'Administrador Principal', rol: 'admin' }
+      });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/usuarios - Listar todos los usuarios
+app.get('/api/usuarios', async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, username, nombre, rol, activo, creado_en FROM usuarios ORDER BY id ASC"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/usuarios - Crear nuevo usuario
+app.post('/api/usuarios', async (req, res) => {
+  try {
+    const { username, password, nombre, rol } = req.body;
+    if (!username || !password || !nombre) {
+      return res.status(400).json({ error: "Todos los campos son obligatorios" });
+    }
+    const cleanUser = username.trim().toLowerCase();
+    const cleanRol = rol === 'admin' ? 'admin' : 'vendedor';
+
+    // Verificar si ya existe
+    const exists = await pool.query("SELECT id FROM usuarios WHERE LOWER(username) = $1", [cleanUser]);
+    if (exists.rows.length > 0) {
+      return res.status(400).json({ error: "El nombre de usuario ya está registrado" });
+    }
+
+    const insertResult = await pool.query(
+      "INSERT INTO usuarios (username, password, nombre, rol) VALUES ($1, $2, $3, $4) RETURNING id, username, nombre, rol, activo, creado_en",
+      [cleanUser, password, nombre.trim(), cleanRol]
+    );
+
+    res.status(201).json(insertResult.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/usuarios/:id - Eliminar usuario
+app.delete('/api/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userCheck = await pool.query("SELECT username FROM usuarios WHERE id = $1", [id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    if (userCheck.rows[0].username === 'admin') {
+      return res.status(403).json({ error: "No es posible eliminar al Administrador Principal" });
+    }
+
+    await pool.query("DELETE FROM usuarios WHERE id = $1", [id]);
+    res.json({ message: "Usuario eliminado correctamente" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

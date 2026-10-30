@@ -1116,152 +1116,202 @@ function App() {
   return (
     <div className="min-h-screen flex flex-col font-sans bg-white w-full">
 
-      {/* Sticky Header Block */}
-      <div className="sticky-header print:hidden">
-      {/* Top WhatsApp Bar - estilo Grupo Kafi */}
-      <div className="bg-brand text-white text-center text-xs md:text-sm py-2 font-medium tracking-wide">
-        <a
-          href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`}
-          target="_blank"
-          rel="noreferrer"
-          className="hover:underline inline-flex items-center gap-1.5"
-        >
-          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
-          WhatsApp: {WHATSAPP_NUMBER.replace('+51', '')}
-        </a>
-      </div>
+      {/* Header Block: Diferenciado entre Modo Admin y Modo Tienda */}
+      {viewMode === 'admin' ? (
+        <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-lg print:hidden">
+          <div className="w-full px-3.5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-3">
+            {/* Left: Brand + Admin Badge */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="font-cursive text-2xl sm:text-3xl text-brand leading-none select-none tracking-wide">
+                YuMar
+              </span>
+              <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] sm:text-xs font-heading font-extrabold px-2 sm:px-2.5 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Admin
+              </span>
+              {webPedidosPendientesCount > 0 && (
+                <span className="hidden sm:inline-flex items-center gap-1.5 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-bold px-2.5 py-0.5 rounded-full shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                  {webPedidosPendientesCount} {webPedidosPendientesCount === 1 ? 'nuevo pedido' : 'nuevos pedidos'}
+                </span>
+              )}
+            </div>
 
-      {/* Main Header */}
-      <header className="bg-white border-b border-slate-100">
-        <div className="w-full px-4 py-3 md:py-4">
-          <div className="flex items-center justify-between gap-4">
-
-            {/* Left: Social + Mobile menu */}
-            <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Right: Actions (Ver Tienda + Salir) */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="md:hidden p-1.5 text-brand"
-                aria-label="Menú"
+                onClick={() => { setViewMode('shop'); closeProduct(); clearFilters(); }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-heading font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition shadow-sm active:scale-95"
+                title="Volver a la tienda pública"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                </svg>
+                <span>🏪</span>
+                <span className="hidden xs:inline sm:inline">Ver Tienda</span>
               </button>
-              <div className="hidden md:flex items-center gap-2">
-                <span className="text-sm text-slate-600 font-medium">¡Síguenos!</span>
-                <a href="https://www.facebook.com/share/1BqZay682t/" target="_blank" rel="noreferrer" className="text-brand hover:opacity-80 transition" aria-label="Facebook">
-                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </a>
 
-                <a href="https://www.tiktok.com/@yumar.importacion?_r=1&_t=ZS-97QaykM2SKl" target="_blank" rel="noreferrer" className="text-brand hover:opacity-80 transition" aria-label="TikTok">
-                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
-                </a>
+              {isAdminAuthenticated && (
+                <button
+                  onClick={() => { 
+                    setViewMode('shop'); 
+                    setIsAdminAuthenticated(false); 
+                    localStorage.setItem('yumar_viewMode', 'shop');
+                    localStorage.setItem('yumar_adminAuth', 'false');
+                    if (window.location.hash) history.replaceState(null, '', window.location.pathname);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-heading font-bold text-rose-300 hover:text-white bg-rose-500/15 hover:bg-rose-600 border border-rose-500/30 hover:border-rose-600 transition shadow-sm active:scale-95"
+                  title="Cerrar Sesión"
+                >
+                  <span>🚪</span>
+                  <span>Salir</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+      ) : (
+        <div className="sticky-header print:hidden">
+          {/* Top WhatsApp Bar - estilo Grupo Kafi */}
+          <div className="bg-brand text-white text-center text-xs md:text-sm py-2 font-medium tracking-wide">
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline inline-flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
+              WhatsApp: {WHATSAPP_NUMBER.replace('+51', '')}
+            </a>
+          </div>
+
+          {/* Main Header */}
+          <header className="bg-white border-b border-slate-100">
+            <div className="w-full px-4 py-3 md:py-4">
+              <div className="flex items-center justify-between gap-4">
+
+                {/* Left: Social + Mobile menu */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="md:hidden p-1.5 text-brand"
+                    aria-label="Menú"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                  </button>
+                  <div className="hidden md:flex items-center gap-2">
+                    <span className="text-sm text-slate-600 font-medium">¡Síguenos!</span>
+                    <a href="https://www.facebook.com/share/1BqZay682t/" target="_blank" rel="noreferrer" className="text-brand hover:opacity-80 transition" aria-label="Facebook">
+                      <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    </a>
+
+                    <a href="https://www.tiktok.com/@yumar.importacion?_r=1&_t=ZS-97QaykM2SKl" target="_blank" rel="noreferrer" className="text-brand hover:opacity-80 transition" aria-label="TikTok">
+                      <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Center: Logo (5 toques para abrir Admin) */}
+                <div
+                  className="flex-1 flex flex-col items-center cursor-pointer select-none active:scale-95 transition-transform"
+                  onClick={handleLogoClick}
+                >
+                  <span className="font-cursive text-2xl md:text-[2.75rem] text-brand leading-none">
+                    YuMar Importaciones
+                  </span>
+                  <span className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] md:tracking-[0.25em] font-heading font-semibold text-slate-400 mt-3 md:mt-4 hidden sm:block">
+                    Tecnología · Hogar · Belleza · Deporte
+                  </span>
+                </div>
+
+                {/* Right: Search, Mi Cuenta, Cart */}
+                <div className="flex items-center gap-1 md:gap-3 flex-shrink-0 justify-end">
+
+                  {/* Search */}
+                  <button
+                    onClick={() => setSearchOpen(!searchOpen)}
+                    className="p-2 rounded-full hover:bg-pink-50 transition group"
+                    aria-label="Buscar"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6" style={{ color: '#0ea5e9' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.637Z" />
+                    </svg>
+                  </button>
+
+                  {/* Cart */}
+                  <button
+                    onClick={() => setCartOpen(true)}
+                    className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-orange-50 transition"
+                    aria-label="Carrito"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 md:w-7 md:h-7" style={{ color: '#0ea5e9' }}>
+                      <path d="M2.25 2.25a.75.75 0 0 0 0 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 0 0-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 0 0 0-1.5H5.378A2.25 2.25 0 0 1 7.5 15h11.218a.75.75 0 0 0 .674-.421 60.358 60.358 0 0 0 2.96-7.228.75.75 0 0 0-.525-.965A60.864 60.864 0 0 0 5.68 4.509l-.232-.867A1.875 1.875 0 0 0 3.636 2.25H2.25ZM16.5 18a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM7.5 19.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z" />
+                    </svg>
+                    <span className="text-sm font-heading font-bold hidden sm:inline text-slate-700">
+                      S/ {cartTotal.toFixed(2)}
+                    </span>
+                    {cartCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-brand text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow">
+                        {cartCount}
+                      </span>
+                    )}
+                  </button>
+
+                </div>
               </div>
             </div>
 
-            {/* Center: Logo (5 toques para abrir Admin) */}
-            <div
-              className="flex-1 flex flex-col items-center cursor-pointer select-none active:scale-95 transition-transform"
-              onClick={handleLogoClick}
-            >
-              <span className="font-cursive text-2xl md:text-[2.75rem] text-brand leading-none">
-                YuMar Importaciones
-              </span>
-              <span className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] md:tracking-[0.25em] font-heading font-semibold text-slate-400 mt-3 md:mt-4 hidden sm:block">
-                Tecnología · Hogar · Belleza · Deporte
-              </span>
-            </div>
+            {/* Search dropdown */}
+            {searchOpen && (
+              <div className="border-t border-slate-100 bg-white px-4 py-4 animate-fade-in">
+                <form onSubmit={(e) => { handleSearchSubmit(e); setSearchOpen(false); }} className="max-w-2xl mx-auto flex border border-slate-200 rounded overflow-hidden focus-within:border-brand">
+                  <input
+                    type="text"
+                    placeholder="Buscar productos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    autoFocus
+                    className="flex-1 px-4 py-2.5 text-sm focus:outline-none"
+                  />
+                  <button type="submit" className="bg-brand hover:bg-brand-hover text-white px-6 text-sm font-heading font-semibold transition">
+                    Buscar
+                  </button>
+                </form>
+              </div>
+            )}
+          </header>
 
-            {/* Right: Search, Mi Cuenta, Cart */}
-            <div className="flex items-center gap-1 md:gap-3 flex-shrink-0 justify-end">
-
-              {/* Search */}
-              <button
-                onClick={() => setSearchOpen(!searchOpen)}
-                className="p-2 rounded-full hover:bg-pink-50 transition group"
-                aria-label="Buscar"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 md:w-6 md:h-6" style={{ color: '#0ea5e9' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.637Z" />
-                </svg>
-              </button>
-
-              {/* Admin link hidden — accessible via gear icon in footer */}
-
-              {/* Cart */}
-              <button
-                onClick={() => setCartOpen(true)}
-                className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-orange-50 transition"
-                aria-label="Carrito"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 md:w-7 md:h-7" style={{ color: '#0ea5e9' }}>
-                  <path d="M2.25 2.25a.75.75 0 0 0 0 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 0 0-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 0 0 0-1.5H5.378A2.25 2.25 0 0 1 7.5 15h11.218a.75.75 0 0 0 .674-.421 60.358 60.358 0 0 0 2.96-7.228.75.75 0 0 0-.525-.965A60.864 60.864 0 0 0 5.68 4.509l-.232-.867A1.875 1.875 0 0 0 3.636 2.25H2.25ZM16.5 18a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM7.5 19.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z" />
-                </svg>
-                <span className="text-sm font-heading font-bold hidden sm:inline text-slate-700">
-                  S/ {cartTotal.toFixed(2)}
-                </span>
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-brand text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-
-            </div>
-          </div>
+          {/* Category Navigation Bar */}
+          {viewMode === 'shop' && (
+            <nav className="bg-[#f5f5f5] border-b border-slate-200 cat-nav-scroll overflow-x-auto">
+              <div className="w-full px-2 flex">
+                {navCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => { setCurrentCategory(cat); closeProduct(); }}
+                    className={`whitespace-nowrap px-3 md:px-5 py-3 text-xs md:text-sm font-heading font-medium transition-colors border-b-2 ${
+                      currentCategory === cat
+                        ? 'text-brand border-brand bg-white'
+                        : 'text-slate-600 border-transparent hover:text-brand hover:bg-white/50'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+                <button
+                  onClick={() => { clearFilters(); closeProduct(); }}
+                  className={`whitespace-nowrap px-3 md:px-5 py-3 text-xs md:text-sm font-heading font-medium transition-colors border-b-2 shrink-0 ${
+                    currentCategory === 'Todos'
+                      ? 'text-brand border-brand bg-white'
+                      : 'text-slate-600 border-transparent hover:text-brand hover:bg-white/50'
+                  }`}
+                >
+                  Ver todo
+                </button>
+              </div>
+            </nav>
+          )}
         </div>
-
-        {/* Search dropdown */}
-        {searchOpen && (
-          <div className="border-t border-slate-100 bg-white px-4 py-4 animate-fade-in">
-            <form onSubmit={(e) => { handleSearchSubmit(e); setSearchOpen(false); }} className="max-w-2xl mx-auto flex border border-slate-200 rounded overflow-hidden focus-within:border-brand">
-              <input
-                type="text"
-                placeholder="Buscar productos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                autoFocus
-                className="flex-1 px-4 py-2.5 text-sm focus:outline-none"
-              />
-              <button type="submit" className="bg-brand hover:bg-brand-hover text-white px-6 text-sm font-heading font-semibold transition">
-                Buscar
-              </button>
-            </form>
-          </div>
-        )}
-      </header>
-
-      {/* Category Navigation Bar */}
-      {viewMode === 'shop' && (
-        <nav className="bg-[#f5f5f5] border-b border-slate-200 cat-nav-scroll overflow-x-auto">
-          <div className="w-full px-2 flex">
-            {navCategories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => { setCurrentCategory(cat); closeProduct(); }}
-                className={`whitespace-nowrap px-3 md:px-5 py-3 text-xs md:text-sm font-heading font-medium transition-colors border-b-2 ${
-                  currentCategory === cat
-                    ? 'text-brand border-brand bg-white'
-                    : 'text-slate-600 border-transparent hover:text-brand hover:bg-white/50'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-            <button
-              onClick={() => { clearFilters(); closeProduct(); }}
-              className={`whitespace-nowrap px-3 md:px-5 py-3 text-xs md:text-sm font-heading font-medium transition-colors border-b-2 shrink-0 ${
-                currentCategory === 'Todos'
-                  ? 'text-brand border-brand bg-white'
-                  : 'text-slate-600 border-transparent hover:text-brand hover:bg-white/50'
-              }`}
-            >
-              Ver todo
-            </button>
-          </div>
-        </nav>
       )}
-      </div>
 
 
 
@@ -2235,7 +2285,7 @@ function App() {
       ) : (
         // BACKEND / ADMIN VIEW
         <main className="w-full px-3 sm:px-4 py-6 sm:py-10 flex-1">
-          {/* Admin Header */}
+          {/* Admin Header Title */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 border-b border-slate-200 pb-4">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -2250,20 +2300,8 @@ function App() {
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Administra inventario, pedidos, reclamos y reseñas.</p>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Administra inventario, pedidos, reclamos y reseñas en tiempo real.</p>
             </div>
-            <button 
-              onClick={() => { 
-                setViewMode('shop'); 
-                setIsAdminAuthenticated(false); 
-                localStorage.setItem('yumar_viewMode', 'shop');
-                localStorage.setItem('yumar_adminAuth', 'false');
-                if (window.location.hash) history.replaceState(null, '', window.location.pathname);
-              }}
-              className="self-start sm:self-auto bg-rose-600 hover:bg-rose-700 text-white font-heading font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl transition shadow-md shadow-rose-600/20 flex items-center gap-1.5"
-            >
-              🚪 Cerrar Sesión
-            </button>
           </div>
 
           {/* Layout Container: sidebar nav arriba en móvil, lateral en lg */}
@@ -3070,8 +3108,8 @@ function App() {
                       showToast('Categoría agregada');
                     } catch (err) { showToast('Error al agregar'); }
                   }} className="flex gap-2">
-                    <input name="catName" type="text" placeholder="Ej: Herramientas..." required className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-brand" />
-                    <button type="submit" className="bg-brand hover:bg-brand-hover text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md shadow-brand/20 transition">Añadir</button>
+                    <input name="catName" type="text" placeholder="Ej: Herramientas..." required className="min-w-0 flex-1 px-3 sm:px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-brand" />
+                    <button type="submit" className="shrink-0 bg-brand hover:bg-brand-hover text-white px-4 sm:px-5 py-2.5 rounded-lg text-sm font-bold shadow-md shadow-brand/20 transition">Añadir</button>
                   </form>
                 </div>
                 <div>
@@ -3516,88 +3554,94 @@ function App() {
         </section>
       )}
 
-      {/* Footer - estilo Grupo Kafi con fondo negro */}
-      <footer className="bg-slate-900 pt-8 md:pt-10 pb-6 mt-auto print:hidden">
-        <div className="w-full px-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-          <div>
-            <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">📞 Teléfono</h4>
-            <a href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`} className="text-xs md:text-sm text-white hover:text-brand transition">
-              +51 967 227 469
-            </a>
-            <h4 className="font-heading font-bold text-xs md:text-sm text-brand mt-3 md:mt-4 mb-2">📧 Correo electrónico</h4>
-            <a href="mailto:Yumarperu@gmail.com" className="text-xs md:text-sm text-white hover:text-brand transition block">
-              Yumarperu@gmail.com
-            </a>
-          </div>
+      {/* Footer */}
+      {viewMode !== 'admin' ? (
+        <footer className="bg-slate-900 pt-8 md:pt-10 pb-6 mt-auto print:hidden">
+          <div className="w-full px-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+            <div>
+              <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">📞 Teléfono</h4>
+              <a href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`} className="text-xs md:text-sm text-white hover:text-brand transition">
+                +51 967 227 469
+              </a>
+              <h4 className="font-heading font-bold text-xs md:text-sm text-brand mt-3 md:mt-4 mb-2">📧 Correo electrónico</h4>
+              <a href="mailto:Yumarperu@gmail.com" className="text-xs md:text-sm text-white hover:text-brand transition block">
+                Yumarperu@gmail.com
+              </a>
+            </div>
 
-          <div>
-            <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">📦 Nuestras categorías</h4>
-            <ul className="text-xs md:text-sm space-y-1.5">
-              {navCategories.map((cat) => (
-                <li key={cat}>
+            <div>
+              <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">📦 Nuestras categorías</h4>
+              <ul className="text-xs md:text-sm space-y-1.5">
+                {navCategories.map((cat) => (
+                  <li key={cat}>
+                    <button
+                      onClick={() => { setViewMode('shop'); setCurrentCategory(cat); closeProduct(); }}
+                      className="text-white hover:text-brand transition text-left"
+                    >
+                      {cat}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">🔗 Enlaces de interés</h4>
+              <ul className="text-xs md:text-sm space-y-1.5 text-white">
+                <li><a href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`} className="hover:text-brand transition">Cómo comprar</a></li>
+                <li><span className="hover:text-brand cursor-pointer">Políticas de privacidad</span></li>
+                <li><span className="hover:text-brand cursor-pointer">Medios de pago</span></li>
+                <li><span className="hover:text-brand cursor-pointer">Sobre los envíos</span></li>
+                <li>
                   <button
-                    onClick={() => { setViewMode('shop'); setCurrentCategory(cat); closeProduct(); }}
-                    className="text-white hover:text-brand transition text-left"
+                    onClick={() => { setViewMode('reclamaciones'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="hover:text-brand transition text-left"
                   >
-                    {cat}
+                    📖 Libro de reclamaciones
                   </button>
                 </li>
-              ))}
-            </ul>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">💬 Contáctanos</h4>
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=Hola,%20necesito%20información%20sobre%20sus%20productos.`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white text-xs font-heading font-bold px-3 md:px-4 py-2 md:py-2.5 rounded transition"
+              >
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
+                WhatsApp
+              </a>
+              <p className="text-[10px] md:text-xs text-slate-400 mt-2 md:mt-3 leading-relaxed">
+                Envíos a nivel nacional vía Olva Courier, Shalom o transportes de confianza.
+              </p>
+            </div>
           </div>
 
-          <div>
-            <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">🔗 Enlaces de interés</h4>
-            <ul className="text-xs md:text-sm space-y-1.5 text-white">
-              <li><a href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`} className="hover:text-brand transition">Cómo comprar</a></li>
-              <li><span className="hover:text-brand cursor-pointer">Políticas de privacidad</span></li>
-              <li><span className="hover:text-brand cursor-pointer">Medios de pago</span></li>
-              <li><span className="hover:text-brand cursor-pointer">Sobre los envíos</span></li>
-              <li>
-                <button
-                  onClick={() => { setViewMode('reclamaciones'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  className="hover:text-brand transition text-left"
-                >
-                  📖 Libro de reclamaciones
-                </button>
-              </li>
-            </ul>
+          <div className="w-full px-4 pt-6 md:pt-8 pb-4 md:pb-6 border-t border-slate-800">
+            <div className="text-center">
+              <span 
+                onClick={handleLogoClick}
+                className="font-cursive text-lg md:text-xl text-brand block mb-2 md:mb-3 cursor-pointer select-none"
+              >
+                YuMar Importaciones
+              </span>
+              <p className="text-[9px] md:text-[10px] text-slate-400 font-heading inline-flex items-center gap-1.5 justify-center">
+                © {new Date().getFullYear()} YuMar Importaciones. Todos los derechos reservados.
+              </p>
+            </div>
           </div>
-
-          <div>
-            <h4 className="font-heading font-bold text-xs md:text-sm text-brand mb-2 md:mb-3">💬 Contáctanos</h4>
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=Hola,%20necesito%20información%20sobre%20sus%20productos.`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white text-xs font-heading font-bold px-3 md:px-4 py-2 md:py-2.5 rounded transition"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.623-1.023-5.086-2.884-6.948C16.59 2.012 14.125.99 11.516.99c-5.44 0-9.864 4.372-9.868 9.8.001 1.93.524 3.818 1.513 5.497L2.122 21.9l5.7-1.494z"/></svg>
-              WhatsApp
-            </a>
-            <p className="text-[10px] md:text-xs text-slate-400 mt-2 md:mt-3 leading-relaxed">
-              Envíos a nivel nacional vía Olva Courier, Shalom o transportes de confianza.
-            </p>
-          </div>
-        </div>
-
-        <div className="w-full px-4 pt-6 md:pt-8 pb-4 md:pb-6 border-t border-slate-800">
-          <div className="text-center">
-            <span 
-              onClick={handleLogoClick}
-              className="font-cursive text-lg md:text-xl text-brand block mb-2 md:mb-3 cursor-pointer select-none"
-            >
-              YuMar Importaciones
-            </span>
-            <p className="text-[9px] md:text-[10px] text-slate-400 font-heading inline-flex items-center gap-1.5 justify-center">
-              © {new Date().getFullYear()} YuMar Importaciones. Todos los derechos reservados.
-            </p>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      ) : (
+        <footer className="bg-slate-900 border-t border-slate-800 py-3.5 px-4 text-center text-xs text-slate-500 mt-auto print:hidden">
+          <p>© {new Date().getFullYear()} YuMar Importaciones · Panel de Administración Privado</p>
+        </footer>
+      )}
 
       {/* SIDEBAR NAVIGATION DRAWER (LEFT SIDE) */}
-      {sidebarOpen && (
+      {sidebarOpen && viewMode !== 'admin' && (
         <div className="fixed inset-0 z-50 flex animate-fade-in">
           {/* Backdrop */}
           <div 

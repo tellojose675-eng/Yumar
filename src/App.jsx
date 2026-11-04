@@ -194,21 +194,7 @@ function App() {
     localStorage.setItem('yumar_adminTab', adminTab);
   }, [adminTab]);
 
-  // URL Hash Routing: mantiene la pestaña fija al recargar (ej. #analitica, #pos, #pedidos)
-  useEffect(() => {
-    const handleHash = () => {
-      const hash = (window.location.hash || '').replace('#', '');
-      if (['admin', 'analitica', 'pos', 'pedidos', 'productos', 'reclamos', 'resenas', 'categorias'].includes(hash)) {
-        setViewMode('admin');
-        if (hash !== 'admin') setAdminTab(hash);
-      } else if (hash === 'reclamaciones') {
-        setViewMode('reclamaciones');
-      }
-    };
-    handleHash();
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
+  // URL Hash Routing se gestiona de forma unificada tras la definición de productos y vistas
 
   useEffect(() => {
     if (viewMode === 'admin' && isAdminAuthenticated) {
@@ -1133,15 +1119,117 @@ function App() {
   const getRelatedProducts = (product) =>
     allProducts.filter(p => p.id !== product.id && p.categoria === product.categoria).slice(0, 8);
 
-  const openProduct = (product) => {
+  // --- NAVEGACIÓN E HISTORIAL DE PRODUCTOS Y VISTAS ---
+  const hasProductHistoryRef = useRef(false);
+  const scrollPositionRef = useRef(0);
+  const selectedProductRef = useRef(selectedProduct);
+  selectedProductRef.current = selectedProduct;
+  const viewModeRef = useRef(viewMode);
+  viewModeRef.current = viewMode;
+  const allProductsRef = useRef(allProducts);
+  allProductsRef.current = allProducts;
+
+  const openProduct = (product, updateHistory = true) => {
+    if (!selectedProductRef.current) {
+      scrollPositionRef.current = window.scrollY || window.pageYOffset || 0;
+    }
     setSelectedProduct(product);
     setDetailQuantity(1);
     setProductResenas([]);
     fetchProductResenas(product.id);
+    if (updateHistory) {
+      hasProductHistoryRef.current = true;
+      const targetHash = `#producto-${product.id}`;
+      if (window.location.hash !== targetHash) {
+        window.history.pushState({ type: 'product', productId: product.id }, '', targetHash);
+      }
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const closeProduct = () => setSelectedProduct(null);
+  const closeProduct = () => {
+    setSelectedProduct(null);
+    if (window.location.hash.startsWith('#producto-')) {
+      if (hasProductHistoryRef.current) {
+        hasProductHistoryRef.current = false;
+        window.history.back();
+      } else {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+    setTimeout(() => {
+      if (scrollPositionRef.current) {
+        window.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' });
+      }
+    }, 60);
+  };
+
+  // Escuchar eventos de retroceso/avance del navegador (popstate y hashchange)
+  useEffect(() => {
+    const handleHash = () => {
+      const rawHash = window.location.hash || '';
+      const hash = rawHash.replace('#', '');
+
+      // 1. Si la URL contiene un producto (#producto-123)
+      if (hash.startsWith('producto-')) {
+        const prodId = hash.replace('producto-', '');
+        const found = allProductsRef.current.find(p => String(p.id) === String(prodId));
+        if (found) {
+          if (!selectedProductRef.current || String(selectedProductRef.current.id) !== String(found.id)) {
+            openProduct(found, false);
+          }
+        }
+        return;
+      }
+
+      // 2. Si veníamos de un producto y el usuario presionó Atrás en el navegador
+      if (selectedProductRef.current) {
+        setSelectedProduct(null);
+        hasProductHistoryRef.current = false;
+        setTimeout(() => {
+          if (scrollPositionRef.current) {
+            window.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' });
+          }
+        }, 60);
+      }
+
+      // 3. Pestañas de administración y otras vistas
+      if (['admin', 'analitica', 'pos', 'pedidos', 'productos', 'reclamos', 'resenas', 'categorias'].includes(hash)) {
+        setViewMode('admin');
+        if (hash !== 'admin') setAdminTab(hash);
+      } else if (hash === 'reclamaciones') {
+        setViewMode('reclamaciones');
+      } else if (hash === 'checkout') {
+        setViewMode('checkout');
+      } else if (!hash || hash === 'shop') {
+        if (viewModeRef.current !== 'shop' && viewModeRef.current !== 'admin') {
+          setViewMode('shop');
+        }
+      }
+    };
+
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    window.addEventListener('popstate', handleHash);
+    return () => {
+      window.removeEventListener('hashchange', handleHash);
+      window.removeEventListener('popstate', handleHash);
+    };
+  }, []);
+
+  // Si allProducts cargó después del primer render y hay un hash de producto, abrirlo
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      const hash = (window.location.hash || '').replace('#', '');
+      if (hash.startsWith('producto-')) {
+        const prodId = hash.replace('producto-', '');
+        const found = allProducts.find(p => String(p.id) === String(prodId));
+        if (found && (!selectedProduct || String(selectedProduct.id) !== String(found.id))) {
+          openProduct(found, false);
+        }
+      }
+    }
+  }, [allProducts]);
 
   // Acceso al panel de administración mediante 5 toques rápidos en el logo
   const logoTapCountRef = useRef(0);
@@ -1453,16 +1541,31 @@ function App() {
           {selectedProduct ? (
             /* ===== PRODUCT DETAIL PAGE - estilo Grupo Kafi ===== */
             <div className="animate-fade-in">
-              {/* Breadcrumb */}
-              <div className="w-full px-4 py-3 text-xs text-slate-400">
-                <button onClick={closeProduct} className="hover:text-brand transition">Inicio</button>
-                <span className="mx-2">/</span>
-                <button
-                  onClick={() => { setCurrentCategory(selectedProduct.categoria); closeProduct(); }}
-                  className="hover:text-brand transition uppercase"
-                >
-                  {selectedProduct.badge || selectedProduct.categoria}
-                </button>
+              {/* Breadcrumb & Botón Volver */}
+              <div className="w-full px-4 py-3 text-xs text-slate-500 flex items-center justify-between gap-3 border-b border-slate-100 bg-white/60">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <button
+                    onClick={closeProduct}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-heading font-bold text-slate-700 bg-slate-100 hover:bg-brand hover:text-white transition shadow-sm active:scale-95 cursor-pointer"
+                    title="Volver a la tienda"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Volver a la tienda</span>
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button onClick={closeProduct} className="hover:text-brand transition font-medium">Inicio</button>
+                  <span className="text-slate-300">/</span>
+                  <button
+                    onClick={() => { setCurrentCategory(selectedProduct.categoria); closeProduct(); }}
+                    className="hover:text-brand transition uppercase font-semibold text-slate-600 truncate max-w-[150px]"
+                  >
+                    {selectedProduct.badge || selectedProduct.categoria}
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-slate-400 truncate max-w-[200px] hidden sm:inline">{selectedProduct.nombre}</span>
+                </div>
               </div>
 
               {/* Product main layout */}
@@ -1533,6 +1636,7 @@ function App() {
                       onClick={() => {
                         addToCart(selectedProduct, detailQuantity);
                         setViewMode('checkout');
+                        window.location.hash = '#checkout';
                         showToast("Por favor, completa tus datos para finalizar la compra.");
                       }}
                       className="mt-4 w-full bg-brand hover:bg-brand-hover text-white font-heading font-bold text-sm py-3.5 rounded transition uppercase tracking-wide"
@@ -1670,6 +1774,19 @@ function App() {
                     </div>
                   </section>
                 )}
+
+                {/* Botón inferior para volver */}
+                <div className="mt-12 text-center border-t border-slate-100 pt-8">
+                  <button
+                    onClick={closeProduct}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-heading font-bold text-slate-700 bg-slate-100 hover:bg-brand hover:text-white transition shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Volver a la tienda</span>
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -3746,6 +3863,7 @@ function App() {
                 onClick={() => {
                   if (item.title === 'Libro de') {
                     setViewMode('reclamaciones');
+                    window.location.hash = '#reclamaciones';
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }
                 }}
@@ -3801,7 +3919,7 @@ function App() {
                 <li><span className="hover:text-brand cursor-pointer">Sobre los envíos</span></li>
                 <li>
                   <button
-                    onClick={() => { setViewMode('reclamaciones'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => { setViewMode('reclamaciones'); window.location.hash = '#reclamaciones'; window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="hover:text-brand transition text-left"
                   >
                     📖 Libro de reclamaciones
@@ -4062,6 +4180,7 @@ function App() {
                 <button 
                   onClick={() => {
                     setViewMode('checkout');
+                    window.location.hash = '#checkout';
                     setCartOpen(false);
                   }}
                   className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white py-3.5 rounded-xl font-heading font-bold text-sm shadow-lg shadow-brand/10 transition"

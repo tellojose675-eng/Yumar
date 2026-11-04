@@ -4231,7 +4231,7 @@ function App() {
       )}
 
       {/* ASISTENTE VIRTUAL IA (YumarIA) - Componente Aislado */}
-      <AiChatWidget addToCart={addToCart} cartOpen={cartOpen} viewMode={viewMode} />
+      <AiChatWidget addToCart={addToCart} cartOpen={cartOpen} viewMode={viewMode} openProduct={openProduct} />
 
       {/* FLOATING TOAST SYSTEM */}
       {toast.show && (
@@ -4245,7 +4245,7 @@ function App() {
 }
 
 // COMPONENTE AISLADO PARA EVITAR RE-RENDERS AL ESCRIBIR EN LA IA
-function AiChatWidget({ addToCart, cartOpen, viewMode }) {
+function AiChatWidget({ addToCart, cartOpen, viewMode, openProduct }) {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([
     {
@@ -4308,7 +4308,17 @@ function AiChatWidget({ addToCart, cartOpen, viewMode }) {
 
       if (res.ok) {
         const data = await res.json();
-        setAiMessages(prev => [...prev, { sender: 'bot', text: data.reply, products: data.products }]);
+        setAiMessages(prev => [...prev, {
+          sender: 'bot',
+          text: data.reply,
+          products: data.products,
+          directProduct: data.directProduct
+        }]);
+
+        // Si la IA encontró el producto exacto y envía directProduct, ¡mandar directo al producto!
+        if (data.directProduct && openProduct) {
+          openProduct(data.directProduct);
+        }
       } else {
         setAiMessages(prev => [...prev, { sender: 'bot', text: 'Lo siento, ocurrió un inconveniente. Intenta de nuevo por favor.' }]);
       }
@@ -4383,14 +4393,18 @@ function AiChatWidget({ addToCart, cartOpen, viewMode }) {
                     <div className="mt-3 space-y-2 pt-2 border-t border-slate-100">
                       {msg.products.map((p) => (
                         <div key={p.id} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/90 flex items-center justify-between gap-2 shadow-xs hover:border-indigo-300 transition">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                          <div 
+                            className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1 group/item"
+                            onClick={() => openProduct && openProduct(p)}
+                            title="Haz clic para ver la ficha completa del producto"
+                          >
                             {p.imagen ? (
-                              <img src={p.imagen} alt={p.nombre} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                              <img src={p.imagen} alt={p.nombre} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0 group-hover/item:scale-105 transition" />
                             ) : (
                               <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center font-bold text-sm shrink-0">🛍️</div>
                             )}
                             <div className="min-w-0">
-                              <h4 className="font-bold text-[11px] text-slate-900 truncate leading-tight">{p.nombre}</h4>
+                              <h4 className="font-bold text-[11px] text-slate-900 truncate leading-tight group-hover/item:text-indigo-600 transition">{p.nombre}</h4>
                               <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
                                 <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-semibold">{p.categoria || 'General'}</span>
                                 <span className="font-bold text-slate-900">S/{parseFloat(p.precio).toFixed(2)}</span>
@@ -4400,15 +4414,26 @@ function AiChatWidget({ addToCart, cartOpen, viewMode }) {
                               </p>
                             </div>
                           </div>
-                          {p.stock > 0 && (
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              onClick={() => addToCart(p, 1)}
-                              className="shrink-0 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] transition shadow-xs flex items-center gap-1"
+                              onClick={() => openProduct && openProduct(p)}
+                              title="Ver ficha directa del producto"
+                              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2 py-1.5 rounded-lg text-[10px] transition flex items-center gap-0.5"
                             >
-                              🛒 Agregar
+                              👁️ Ver
                             </button>
-                          )}
+                            {p.stock > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => addToCart(p, 1)}
+                                title="Añadir al carrito"
+                                className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold px-2 py-1.5 rounded-lg text-[10px] transition shadow-xs flex items-center gap-1"
+                              >
+                                🛒
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

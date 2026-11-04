@@ -906,15 +906,97 @@ app.post('/api/chat', async (req, res) => {
     const { message, history } = req.body;
     if (!message) return res.status(400).json({ error: "El mensaje es requerido" });
 
-    // Fetch product catalog for context
-    const productsResult = await pool.query("SELECT id, nombre, precio, categoria, stock, descripcion FROM productos");
+    // Fetch product catalog for context with imagen included
+    const productsResult = await pool.query("SELECT id, nombre, precio, imagen, categoria, stock, descripcion FROM productos");
     const catalog = productsResult.rows;
 
-    const catalogSummary = catalog.map(p => 
-      `- ID ${p.id}: "${p.nombre}" | Categoría: ${p.categoria} | Precio: S/${p.precio} | Stock: ${p.stock} unidades | Desc: ${p.descripcion}`
-    ).join('\n');
+    const normalize = (text) =>
+      (text || '')
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 
-    const systemPrompt = `Eres YumarIA, la asistente inteligente de la tienda virtual "Yumar Importaciones".
+    const getStem = (w) => {
+      if (w.endsWith('ces') && w.length > 3) return w.slice(0, -3) + 'z';
+      if (w.endsWith('es') && w.length > 4) return w.slice(0, -2);
+      if (w.endsWith('s') && w.length > 3) return w.slice(0, -1);
+      return w;
+    };
+
+    const STOP_WORDS = new Set([
+      'quiero', 'quisiera', 'busco', 'necesito', 'tienen', 'tiene', 'tendran', 'tendra', 'hay', 'habra',
+      'venden', 'vende', 'deseo', 'dame', 'precio', 'de', 'del', 'la', 'el', 'los', 'las', 'un', 'una',
+      'unos', 'unas', 'por', 'favor', 'para', 'en', 'y', 'o', 'con', 'sin', 'que', 'cual', 'cuales',
+      'donde', 'como', 'cuanto', 'cuesta', 'vale', 'estan', 'esta', 'este', 'estos', 'estas',
+      'algun', 'alguna', 'alguno', 'algunos', 'algunas', 'buenos', 'dias', 'tardes', 'noches', 'hola',
+      'saludos', 'amigo', 'amiga', 'podrias', 'puedes', 'ver', 'mostrar', 'producto', 'productos',
+      'tienda', 'catalogo', 'me', 'gusta', 'interesa', 'tienes', 'aqui', 'alla', 'buenas', 'ola'
+    ]);
+
+    const normMsg = normalize(message);
+    const words = normMsg.split(' ').filter(w => w.length > 1);
+    const searchTerms = words.filter(w => !STOP_WORDS.has(w));
+    const isExplicitSearch = searchTerms.length > 0;
+
+    // Intents
+    const isGreeting = (words.some(w => ['hola', 'buenas', 'buenos', 'saludos', 'ola'].includes(w))) && searchTerms.length === 0;
+    const isPaymentQuery = normMsg.includes('pago') || normMsg.includes('yape') || normMsg.includes('plin') || normMsg.includes('tarjeta') || normMsg.includes('banco') || normMsg.includes('transferencia');
+    const isShippingQuery = normMsg.includes('envio') || normMsg.includes('entrega') || normMsg.includes('donde') || normMsg.includes('tienda') || normMsg.includes('recojo') || normMsg.includes('ubicacion');
+    const isGeneralCatalogQuery = normMsg.includes('oferta') || normMsg.includes('descuento') || normMsg.includes('mas vendido') || normMsg.includes('recomiend') || normMsg.includes('catalogo') || normMsg.includes('que vendes') || normMsg.includes('que tienes');
+
+    // Score all products
+    const scoredProducts = catalog.map(p => {
+      const pNameNorm = normalize(p.nombre);
+      const pCatNorm = normalize(p.categoria);
+      const pDescNorm = normalize(p.descripcion);
+      const pNameWords = pNameNorm.split(' ');
+
+      let score = 0;
+
+      if (isExplicitSearch) {
+        const fullSearch = searchTerms.join(' ');
+        if (pNameNorm.includes(fullSearch)) score += 120;
+        else if (pDescNorm.includes(fullSearch)) score += 30;
+
+        for (const term of searchTerms) {
+          const stem = getStem(term);
+          const exactNameWord = pNameWords.some(pw => pw === term || getStem(pw) === stem);
+          if (exactNameWord) {
+            score += 80;
+          } else if (pNameNorm.includes(term) || (stem.length > 3 && pNameNorm.includes(stem))) {
+            score += 50;
+          }
+
+          if (pCatNorm.includes(term) || (stem.length > 3 && pCatNorm.includes(stem))) {
+            score += 35;
+          }
+
+          if (pDescNorm.includes(term) || (stem.length > 3 && pDescNorm.includes(stem))) {
+            score += 20;
+          }
+        }
+      }
+
+      return { product: p, score };
+    });
+
+    const matchedProducts = scoredProducts
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.product);
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (apiKey) {
+      try {
+        const catalogSummary = catalog.map(p => 
+          `- ID ${p.id}: "${p.nombre}" | Categoría: ${p.categoria} | Precio: S/${p.precio} | Stock: ${p.stock} unidades | Desc: ${p.descripcion}`
+        ).join('\n');
+
+        const systemPrompt = `Eres YumarIA, la asistente inteligente de la tienda virtual "Yumar Importaciones".
 Tu objetivo es ayudar amablemente a los clientes a encontrar productos, responder dudas sobre catálogo, precios, stock, envíos y pagos.
 
 DATOS EN TIEMPO REAL DE YUMAR IMPORTACIONES:
@@ -924,63 +1006,19 @@ DATOS EN TIEMPO REAL DE YUMAR IMPORTACIONES:
 - Catálogo actual:
 ${catalogSummary}
 
-REGLAS DE RESPUESTA:
-1. Responde de forma cordial, clara y directa en español con emoticonos.
-2. Cuando el cliente pregunte por un producto o categoría, DEBES mostrar detalladamente:
-   • 📦 **Producto:** Nombre exacto
-   • 📂 **Sección / Categoría:** Nombre de la categoría
-   • 💰 **Precio:** S/ Precio
-   • 📊 **Stock:** Cantidad disponible (ej: "15 unidades disponibles" o "Agotado")
-   • 📝 **Descripción:** Breve resumen
-3. Respuestas concisas de máximo 2 o 3 párrafos.`;
+REGLAS CRÍTICAS DE BÚSQUEDA Y RESPUESTA:
+1. Revisa todo el catálogo provisto arriba.
+2. Si el cliente pregunta por un producto específico (por ejemplo: "pelota", "perfume", "bicicleta", etc.) y DICHO PRODUCTO NO ESTÁ EN EL CATÁLOGO, DEBES decir de forma clara, directa y respetuosa que NO disponemos de ese producto en la tienda en este momento. NUNCA inventes productos ni ofrezcas productos no relacionados como reemplazo directo sin avisar.
+3. Si el producto SÍ está en el catálogo, confirma con entusiasmo que sí lo tenemos, su precio exacto, categoría y stock disponible.
+4. Respuestas concisas de máximo 2 párrafos.`;
 
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    let matchedProducts = [];
-
-    // Local matching for products with smart intent keywords
-    const lowerMsg = message.toLowerCase();
-    
-    const isGamerQuery = lowerMsg.includes('gamer') || lowerMsg.includes('juego') || lowerMsg.includes('juegos') || lowerMsg.includes('audifono') || lowerMsg.includes('mouse') || lowerMsg.includes('teclado') || lowerMsg.includes('gaming');
-    const isTechQuery = isGamerQuery || lowerMsg.includes('tecnologia') || lowerMsg.includes('tech') || lowerMsg.includes('electronico') || lowerMsg.includes('cable') || lowerMsg.includes('cargador') || lowerMsg.includes('celular') || lowerMsg.includes('luz');
-    const isHogarQuery = lowerMsg.includes('hogar') || lowerMsg.includes('casa') || lowerMsg.includes('cocina') || lowerMsg.includes('limpieza') || lowerMsg.includes('foco');
-    const isBellezaQuery = lowerMsg.includes('belleza') || lowerMsg.includes('cuidado') || lowerMsg.includes('maquillaje') || lowerMsg.includes('facial');
-    const isDeporteQuery = lowerMsg.includes('deporte') || lowerMsg.includes('deportes') || lowerMsg.includes('fitness') || lowerMsg.includes('ejercicio');
-    const isJugueteQuery = lowerMsg.includes('juguete') || lowerMsg.includes('juguetes') || lowerMsg.includes('nino') || lowerMsg.includes('niño');
-
-    matchedProducts = catalog.filter(p => {
-      const pName = p.nombre ? p.nombre.toLowerCase() : '';
-      const pCat = p.categoria ? p.categoria.toLowerCase() : '';
-      const pDesc = p.descripcion ? p.descripcion.toLowerCase() : '';
-
-      if (pName && lowerMsg.includes(pName)) return true;
-      if (pCat && lowerMsg.includes(pCat)) return true;
-      if (pDesc && lowerMsg.includes(pDesc)) return true;
-
-      if (isGamerQuery && (pCat.includes('tecnología') || pCat.includes('tecnologia') || pName.includes('audifono') || pName.includes('mouse') || pName.includes('interruptor') || pName.includes('tomacorriente') || pName.includes('gamer') || pDesc.includes('gamer') || pDesc.includes('led'))) return true;
-      if (isTechQuery && (pCat.includes('tecnología') || pCat.includes('tecnologia'))) return true;
-      if (isHogarQuery && pCat.includes('hogar')) return true;
-      if (isBellezaQuery && pCat.includes('belleza')) return true;
-      if (isDeporteQuery && pCat.includes('deporte')) return true;
-      if (isJugueteQuery && pCat.includes('juguete')) return true;
-
-      return false;
-    });
-
-    // Si busca recomendación general o gamer y no hay filtro específico, mostrar productos con stock
-    if (matchedProducts.length === 0 && (isGamerQuery || isTechQuery || lowerMsg.includes('recomiend') || lowerMsg.includes('suger') || lowerMsg.includes('que comprar') || lowerMsg.includes('destacado'))) {
-      matchedProducts = catalog.filter(p => p.stock > 0);
-    }
-
-    if (apiKey) {
-      try {
         const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [
               { role: 'user', parts: [{ text: systemPrompt }] },
-              { role: 'model', parts: [{ text: '¡Entendido! Mostraré siempre la sección, precio y stock de cada producto.' }] },
+              { role: 'model', parts: [{ text: '¡Entendido! Si el producto no está en el catálogo, diré claramente que no disponemos de él y nunca inventaré productos.' }] },
               ...(history || []).map(h => ({
                 role: h.role === 'user' ? 'user' : 'model',
                 parts: [{ text: h.text }]
@@ -994,7 +1032,12 @@ REGLAS DE RESPUESTA:
           const geminiData = await geminiRes.json();
           const replyText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
           if (replyText) {
-            return res.json({ reply: replyText, products: matchedProducts.slice(0, 3) });
+            const direct = matchedProducts.length > 0 ? matchedProducts[0] : null;
+            return res.json({
+              reply: replyText,
+              products: isExplicitSearch && matchedProducts.length === 0 ? [] : matchedProducts.slice(0, 3),
+              directProduct: direct
+            });
           }
         }
       } catch (err) {
@@ -1004,43 +1047,46 @@ REGLAS DE RESPUESTA:
 
     // Smart Local Fallback Engine
     let reply = "";
+    let returnProducts = [];
+    let directProduct = null;
 
-    if (lowerMsg.includes('hola') || lowerMsg.includes('buenas') || lowerMsg.includes('saludos')) {
-      reply = `¡Hola! 👋 Bienvenido a **Yumar Importaciones**. Soy YumarIA, tu asistente virtual. ¿En qué te puedo ayudar hoy? Puedo buscar productos por categoría, informarte sobre su precio, stock actual, envíos o medios de pago.`;
-    } else if (lowerMsg.includes('pago') || lowerMsg.includes('yape') || lowerMsg.includes('plin') || lowerMsg.includes('tarjeta') || lowerMsg.includes('banco')) {
-      reply = `En **Yumar Importaciones** aceptamos los siguientes métodos de pago:\n\n📱 **Yape / Plin:** 967227469 (Titular: Yuly Quiroz Romero)\n🏦 **Transferencia Bancaria**\n\n¿Deseas ayuda con algún producto?`;
-    } else if (lowerMsg.includes('envio') || lowerMsg.includes('entrega') || lowerMsg.includes('donde') || lowerMsg.includes('tienda') || lowerMsg.includes('recojo') || lowerMsg.includes('ubica')) {
-      reply = `📍 **Punto de Recojo:** Nuestra sede principal está en **Santa Ana**.\n\nTambién realizamos envíos y coordinaciones por WhatsApp al **+51 967227469**.`;
+    if (isGreeting) {
+      reply = `¡Hola! 👋 Bienvenido a **Yumar Importaciones**. Soy YumarIA, tu asistente virtual de compras.\n\n¿Qué producto estás buscando hoy? Dime qué necesitas y buscaré de inmediato en todo nuestro catálogo.`;
+    } else if (isPaymentQuery) {
+      reply = `En **Yumar Importaciones** aceptamos los siguientes métodos de pago:\n\n📱 **Yape / Plin:** 967227469 (Titular: Yuly Quiroz Romero)\n🏦 **Transferencia Bancaria**\n\n¿Deseas que te ayude a encontrar algún producto?`;
+    } else if (isShippingQuery) {
+      reply = `📍 **Punto de Recojo:** Nuestra sede principal está en **Santa Ana, Lima**.\n\nTambién realizamos envíos a todo el Perú y coordinaciones directas por WhatsApp al **+51 967227469**.`;
+    } else if (isExplicitSearch && matchedProducts.length === 0) {
+      // El usuario buscó un producto específico (como "pelota") y NO EXISTE en el catálogo
+      const searchedItem = searchTerms.join(' ');
+      reply = `Lo sentimos, actualmente **no disponemos de "${searchedItem}"** en nuestro catálogo de Yumar Importaciones. 📦❌\n\nTe invitamos a consultar con nuestro equipo por WhatsApp al **+51 967227469** para ver si podemos importarlo o pedirlo bajo pedido, o explorar nuestras categorías disponibles (Tecnología, Hogar, Belleza).`;
+      returnProducts = [];
+      directProduct = null;
     } else if (matchedProducts.length > 0) {
-      const topProds = matchedProducts.slice(0, 3);
-      reply = (isGamerQuery ? `🎮 **Recomendaciones Gamer & Tecnología en Yumar Importaciones:**\n\n` : `¡Claro! Aquí tienes los productos disponibles en nuestro catálogo:\n\n`) +
-        topProds.map(p => 
-          `📦 **Producto:** ${p.nombre}\n` +
-          `📂 **Sección:** ${p.categoria || 'General'}\n` +
-          `💰 **Precio:** S/${parseFloat(p.precio).toFixed(2)}\n` +
-          `📊 **Stock:** ${p.stock > 0 ? `✅ Disponible (${p.stock} unid.)` : '❌ Agotado'}\n` +
-          `📝 **Detalle:** ${p.descripcion || 'Producto importado de alta calidad.'}`
-        ).join('\n\n---\n\n') +
-        `\n\n¿Te gustaría agregar alguno a tu carrito de compras?`;
-    } else if (lowerMsg.includes('oferta') || lowerMsg.includes('descuento') || lowerMsg.includes('recomend') || lowerMsg.includes('mas vendido') || lowerMsg.includes('catalogo')) {
+      // Se encontró el producto!
+      directProduct = matchedProducts[0];
+      returnProducts = matchedProducts.slice(0, 3);
+      reply = `¡Sí tenemos! 🎉 Encontré **${directProduct.nombre}** en la sección **${directProduct.categoria || 'Catálogo'}**.\n\n` +
+        `💰 **Precio:** S/${parseFloat(directProduct.precio).toFixed(2)}\n` +
+        `📊 **Stock:** ${directProduct.stock > 0 ? `✅ Disponible (${directProduct.stock} unid.)` : '❌ Agotado temporalmente'}\n\n` +
+        `🚀 **¡Te he llevado directamente a la ficha del producto en pantalla!**`;
+    } else if (isGeneralCatalogQuery) {
       const inStock = catalog.filter(p => p.stock > 0).slice(0, 3);
+      returnProducts = inStock;
       reply = `🔥 **Productos destacados con stock en Yumar Importaciones:**\n\n` +
         inStock.map(p => 
-          `📦 **${p.nombre}**\n` +
-          `📂 **Sección:** ${p.categoria}\n` +
-          `💰 **Precio:** S/${parseFloat(p.precio).toFixed(2)}\n` +
-          `📊 **Stock:** ✅ ${p.stock} disponibles`
-        ).join('\n\n---\n\n') +
-        `\n\n¿Te gustaría más detalles de alguno?`;
+          `• **${p.nombre}** - S/${parseFloat(p.precio).toFixed(2)} (${p.categoria})`
+        ).join('\n') +
+        `\n\n¿Te gustaría ver alguno en detalle?`;
     } else {
-      const defaultProds = catalog.filter(p => p.stock > 0).slice(0, 2);
-      matchedProducts = defaultProds;
-      reply = `Gracias por tu consulta. En **Yumar Importaciones** tenemos excelentes productos en **Tecnología**, **Hogar**, **Belleza** y más.\n\nAquí tienes un par de opciones con stock en tienda:\n\n` +
-        defaultProds.map(p => `• **${p.nombre}** (S/${parseFloat(p.precio).toFixed(2)}) - ${p.categoria}`).join('\n') +
-        `\n\n¡O escríbeme qué tipo de producto buscas y te daré su precio exacto!`;
+      reply = `Gracias por tu consulta en **Yumar Importaciones**. ¿Estás buscando algún producto en específico? Escribe el nombre (por ejemplo: reloj, cargador, audífonos) y lo buscaré al instante para ti.`;
     }
 
-    res.json({ reply, products: matchedProducts.slice(0, 3) });
+    res.json({
+      reply,
+      products: returnProducts,
+      directProduct
+    });
 
   } catch (err) {
     console.error('Error en /api/chat:', err);

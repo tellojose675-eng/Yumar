@@ -906,7 +906,7 @@ function App() {
         showToast(data.error || "Credenciales incorrectas");
       }
     } catch (err) {
-      if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
+      if (loginForm.username === 'admin' && loginForm.password === 'Yumar1620') {
         const fallback = { id: 1, username: 'admin', nombre: 'Administrador Principal', rol: 'admin' };
         setIsAdminAuthenticated(true);
         setCurrentUser(fallback);
@@ -1007,7 +1007,7 @@ function App() {
   const deletePedido = async (id) => {
     const password = prompt("🔒 Confirmación de Seguridad:\nIngrese la contraseña de administrador para eliminar este pedido:");
     if (password === null) return;
-    if (password !== 'admin123') {
+    if (password !== 'Yumar1620') {
       showToast("❌ Contraseña incorrecta. No se pudo eliminar el pedido.");
       return;
     }
@@ -1030,7 +1030,7 @@ function App() {
   const clearPedidosHistory = async () => {
     const password = prompt("🔒 Confirmación de Seguridad:\nIngrese la contraseña de administrador para vaciar TODO el historial de pedidos:");
     if (password === null) return;
-    if (password !== 'admin123') {
+    if (password !== 'Yumar1620') {
       showToast("❌ Contraseña incorrecta. No se vació el historial.");
       return;
     }

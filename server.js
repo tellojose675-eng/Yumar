@@ -174,14 +174,18 @@ const initializeDatabase = async () => {
       )
     `);
 
-    // Seed default admin user if empty
+    // Seed default admin user if empty or update default admin password
     const usersCount = await pool.query('SELECT COUNT(*) as count FROM usuarios');
     if (usersCount.rows[0].count === '0' || usersCount.rows[0].count === 0) {
       console.log('Seeding initial admin user...');
       await pool.query(`
         INSERT INTO usuarios (username, password, nombre, rol)
-        VALUES ('admin', 'admin123', 'Administrador Principal', 'admin')
+        VALUES ('admin', 'Yumar1620', 'Administrador Principal', 'admin')
         ON CONFLICT (username) DO NOTHING
+      `);
+    } else {
+      await pool.query(`
+        UPDATE usuarios SET password = 'Yumar1620' WHERE username = 'admin' AND password = 'admin123'
       `);
     }
 
@@ -817,7 +821,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Fallback de administrador por defecto si aún no se inicializó en DB
-    if (trimmedUser === 'admin' && password === 'admin123') {
+    if (trimmedUser === 'admin' && password === 'Yumar1620') {
       return res.json({
         success: true,
         user: {
@@ -832,7 +836,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
   } catch (err) {
     console.error("Error en login:", err);
-    if (req.body?.username === 'admin' && req.body?.password === 'admin123') {
+    if (req.body?.username === 'admin' && req.body?.password === 'Yumar1620') {
       return res.json({
         success: true,
         user: { id: 1, username: 'admin', nombre: 'Administrador Principal', rol: 'admin' }
